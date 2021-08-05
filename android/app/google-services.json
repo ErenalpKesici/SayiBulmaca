@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "33417723367",
+    "project_id": "sayibulmaca-657ba",
+    "storage_bucket": "sayibulmaca-657ba.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:33417723367:android:60575306c920898ec6d142",
+        "android_client_info": {
+          "package_name": "com.example.sayibulmaca"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "33417723367-cnda5tppeo2ss58ovvb2a3kmek88a57m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAilXS5AsZldPwaCH2hkMvzvXZ4VIj-CDM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "33417723367-cnda5tppeo2ss58ovvb2a3kmek88a57m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
