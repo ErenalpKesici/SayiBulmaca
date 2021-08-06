@@ -104,15 +104,18 @@ class RegisterPage extends State<RegisterPageSend>{
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Kayit Ol'), centerTitle: true,),
+      appBar: AppBar(title: Text('Kayit Ol', textAlign: TextAlign.center,), centerTitle: true,),
       body: Column(mainAxisAlignment: MainAxisAlignment.center,
         children: [
-           Container(
-              child: TextField(controller: email,
-                textAlign: TextAlign.center,
-                 decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)) ),
+           Padding(
+             padding: const EdgeInsets.all(8.0),
+             child: Container(
+                child: TextField(controller: email,
+                  textAlign: TextAlign.center,
+                   decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)) ),
+                ),
               ),
-            ),
+           ),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Container(
@@ -133,7 +136,7 @@ class RegisterPage extends State<RegisterPageSend>{
             ),
             ElevatedButton(onPressed: () async{
               if(email.text != '' && name.text != '' && password.text != ''){
-                FirebaseFirestore.instance.collection('Users').doc(email.text).set({'email': email.text, 'name': name.text, 'password': password.text, 'status': 0});
+                FirebaseFirestore.instance.collection('Users').doc(email.text).set({'email': email.text, 'name': name.text, 'password': password.text, 'status': 0, 'xp': 0});
                 DocumentReference doc = FirebaseFirestore.instance.collection("Users").doc(email.text);
                 var document = await doc.get();
                 if(!document.exists)
@@ -391,17 +394,45 @@ class AccountPage extends State<AccountPageSend>{
   Users? user;
   AccountPage(this.user);
   @override
+  void initState() {
+
+    super.initState();
+  }
+  Future<int> getXp() async{
+    DocumentReference docUser = FirebaseFirestore.instance.collection("Users").doc(this.user?.email);
+    var documentUser = await docUser.get();
+    return documentUser.get('xp');
+  }
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Hesabim'),centerTitle: true,),
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 50, 20, 0),
+              child: Text(this.user!.name!, textAlign: TextAlign.center, style: TextStyle(fontSize: 48),),
+            ),
+            SizedBox(height: 50,),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: FutureBuilder(future: getXp(), builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot){
+                if(snapshot.hasData){
+                  double xp = snapshot.data/500;
+                  int level = xp.toInt() + 1;
+                  xp /= 10;
+                  return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Colors.purple, minHeight: 50)), Padding( padding: const EdgeInsets.all(4.0), child: Center(child: Text('Seviye ' + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
+                }
+                else
+                  return LinearProgressIndicator(color: Colors.purple, minHeight: 50);
+              }),
+            ),
+            SizedBox(height: 50,),
             ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: (){
               Navigator.of(context).push(MaterialPageRoute(builder: (context) =>UpdatePageSend(user: this.user,)));
             }, child: Text('Hesabi Guncelle', style: TextStyle(fontSize: 30))),
-            SizedBox(height: 20,),
+            SizedBox(height: 50,),
             ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: () async{
               return await showDialog(
                   context: context,
@@ -715,15 +746,24 @@ class GamePage extends State<GamePageSend> {
   FocusNode focused = FocusNode();
   int currentDuration = 0, roundCounter = 0;
   List<String>? otherPlayers;
+  bool guessEnabled = true;
   GamePage(this.user, this.room, this.options);
 
-  Future<List<String>> findPlayers() async{
+  Future<List<String>> findPlayers(bool withXp) async{
     List<String> ret = new List.empty(growable: true);
     DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     var players = document.get('players').split(', ');
     for(int i=0;i<players.length - 1;i++)
         ret.add(players[i]);
+    if(withXp){
+      for(int i=0;i<ret.length;i++){
+        DocumentReference doc = FirebaseFirestore.instance.collection("Users").doc(ret[i]);
+        var document = await doc.get();
+        int xp = document.get('xp');
+        ret[i] += (':' + xp.toString());
+      }
+    }
     return ret;
   }
   void initializeNumber()async{
@@ -761,11 +801,17 @@ class GamePage extends State<GamePageSend> {
     else
       entryList.insert(0, new Entry(1, entered.text, dogru, yanlis, kazandi));
     if(kazandi){
-      int score = (currentDuration/(entryList[0].id) * 10).toInt();
+      int score = (((randomNumber.toString().length/4)* currentDuration/(options!.duration * entryList[0].id)) * 100).toInt();
       DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.room);
       var document = await doc.get();
       var prevWinners = document.get('won');
       FirebaseFirestore.instance.collection('Rooms').doc(this.room).update({'won': prevWinners + this.user!.email! + ':' + score.toString() + ", "});
+      DocumentReference docUser = FirebaseFirestore.instance.collection("Users").doc(this.user?.email);
+      var documentUser = await docUser.get();
+      FirebaseFirestore.instance.collection('Users').doc(this.user?.email).update({'xp': documentUser.get('xp') + score});
+      setState(() {
+        guessEnabled = false;
+      });
       kazandi = true;
     }              
     entered.clear();
@@ -792,6 +838,9 @@ class GamePage extends State<GamePageSend> {
     );
   }
   roundEnd() async {
+    setState(() {
+      guessEnabled = false;
+    });
     DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     var wins = document.get('won');
@@ -827,7 +876,7 @@ class GamePage extends State<GamePageSend> {
                       leaveGame();
                       Navigator.pop(context);
                       Navigator.of(context).push(MaterialPageRoute(builder: (context) =>HomePageSend(user: this.user)));
-                    },child: Center(child: Text("Oyundan Cik"))),               
+                    },child: Center(child: Text("Oyundan Cik"))),           
                 ],
               );
             });
@@ -863,7 +912,7 @@ class GamePage extends State<GamePageSend> {
           userScoreTmp.add({'user': tmp[0], 'score': tmp[1]});
         }
       }
-      List<String> players = await findPlayers();
+      List<String> players = await findPlayers(false);
       for(int i=0;i<players.length;i++){
         userScore.add({'user': players[i], 'score': 0});
       }
@@ -919,9 +968,8 @@ class GamePage extends State<GamePageSend> {
     if(!document.exists)return;
     var inserted = document.get('roundInserted');
     var wins = document.get('won');
-    roundCounter = wins.split('-').length - 1;
+    roundCounter = wins.split('-').length;
     if(!inserted){
-      print("Inesrting");
       await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'number': findRandom(selectedLength), 'won': wins + '-', 'roundInserted': true});
     }
     initializeNumber();
@@ -999,7 +1047,7 @@ class GamePage extends State<GamePageSend> {
           child: Scaffold(
             appBar: AppBar(
               centerTitle: true,
-              title: Text(roundCounter==0?'Sayi Bulmaca':'Round ' + roundCounter.toString()),
+              title: Text(roundCounter==0?'Sayi Bulmaca':'Sayi Bulmaca - Round ' + roundCounter.toString()),
             ),
             body: Column(
               children: [  
@@ -1014,12 +1062,15 @@ class GamePage extends State<GamePageSend> {
                             width: 50,                                               
                             child: ListView.builder(scrollDirection: Axis.horizontal,
                             shrinkWrap: true,itemBuilder: (BuildContext context, int idx){
-                              if(snapshot.data![idx] != this.user!.email)
-                                return Column(children: [Container(width: 25, height: 25, child: Image.asset('assets/account.png')),Text(snapshot.data![idx])],) ;
+                              var userXp = snapshot.data![idx].split(':');
+                              var user = userXp[0];
+                              var xp = userXp[1];
+                              if(user != this.user!.email)
+                                return Column(children: [Container(width: 25, height: 25, child: Image.asset('assets/account.png')), Text(xp), Text(user)],) ;
                               return Container();
                             }, itemCount: snapshot.data?.length),
                           ):Container();
-                        }, future: findPlayers(),),
+                        }, future: findPlayers(true),),
                       ),
                     ],
                   ),
@@ -1035,6 +1086,7 @@ class GamePage extends State<GamePageSend> {
                         autofocus: true,
                         focusNode: focused,
                         controller: entered,
+                        enabled: guessEnabled,
                         textAlign: TextAlign.center,
                         decoration: InputDecoration(labelText: 'Tahmin (' + randomNumber.toString().length.toString() + ")", border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)) ),
                         keyboardType: TextInputType.number,
