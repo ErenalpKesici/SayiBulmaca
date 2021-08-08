@@ -10,8 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 // import 'package:firebase_auth/firebase_auth.dart';
 int randomNumber = 0;
 int? selectedLength = 4;
-// int selectedBestOf = 1;
-// int secondsLeft = 0;
+int xpPerLevel = 100;
 Timer? timerSeconds, timerPlayers;
 List<dynamic> ns = new List.empty(growable: true);
 void main() async{
@@ -67,23 +66,20 @@ class InitialPage extends State<InitialPageSend>{
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(leading: Container(), title: Text('Hesap Girisi'), centerTitle: true,),
-      body: Center(
-        child: Wrap(
-          spacing: 50,
-          direction: Axis.vertical,
-          children: [
-            ElevatedButton(onPressed:(){
-              Navigator.of(context).push(MaterialPageRoute(builder: (context) =>LoginPageSend()));
-            },
-              style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-              child: Text('Giris Yap', style: TextStyle(fontSize: 30))),
-              ElevatedButton(onPressed:(){
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) =>RegisterPageSend()));
-            }, 
-              style: ElevatedButton.styleFrom(padding: EdgeInsets.fromLTRB(16, 16, 24, 16)),
-              child: Text('Kayit  Ol', textAlign: TextAlign.center, style: TextStyle(fontSize: 30))),
-          ],
+      body: Builder(
+        builder: (context) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(style: ElevatedButton.styleFrom(/*padding: EdgeInsets.all(64),*/ minimumSize: Size(MediaQuery.of(context).size.width, (MediaQuery.of(context).size.height - Scaffold.of(context).appBarMaxHeight!)/2 - 10),),onPressed: (){
+                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>LoginPageSend()));
+              }, icon: Icon(Icons.login, size: 64,), label: Text('Giris Yap', style: TextStyle(fontSize: 48))),
+               SizedBox(height: 10,),
+                ElevatedButton.icon(style: ElevatedButton.styleFrom(/*padding: EdgeInsets.all(70)*/minimumSize: Size(MediaQuery.of(context).size.width,  (MediaQuery.of(context).size.height - Scaffold.of(context).appBarMaxHeight!)/2 - 10)), onPressed: (){
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) =>RegisterPageSend()));
+                }, icon: Icon(Icons.person_add, size: 64,), label: Text('Kayit  Ol', textAlign: TextAlign.center, style: TextStyle(fontSize: 48))),
+            ],
+          )
         ),
       ),
     );
@@ -147,7 +143,7 @@ class RegisterPage extends State<RegisterPageSend>{
               else{
                     ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('Lutfen tum bilgileri doldurun')));
               }
-            }, child: Text('OK'))
+            }, child: Text('Uygula'))
         ],
       ),
     );
@@ -206,7 +202,7 @@ class LoginPage extends State<LoginPageSend>{
                     ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('Sifre yanlis girildi')));
                 }
               }
-            }, child: Text('Ok'))
+            }, child: Text('Uygula'))
         ],
       ),
     );
@@ -266,15 +262,13 @@ class HomePage extends State<HomePageSend> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: () async{
+              ElevatedButton.icon(onPressed: ()async{   
                 bool searching = false;
                 var foundRoom, currentPlayers;
                 searchTimer = Timer.periodic(new Duration(seconds: 1), (timer) async{
                   await FirebaseFirestore.instance.collection("Rooms").get().then((value) {
                     value.docs.forEach((result) {
-                      print("search");
                       if(result.get('status') == 'ready'){
-                        print("?");
                         timer.cancel();
                         foundRoom = result.id;
                         currentPlayers = result.get('players');
@@ -292,7 +286,7 @@ class HomePage extends State<HomePageSend> {
                     }
                     if(document.get('status') == 'playing'){
                       var document = await doc.get();
-                      Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, foundRoom, new Options(multiplayer: true, duration: document.get('duration'), bestOf: document.get('bestOf')))));
+                      Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, foundRoom, new Options(multiplayer: true, duration: document.get('duration'), bestOf: document.get('bestOf'), increasingDiff: document.get('increasingDiff'), length: document.get('length')))));
                       timer.cancel();
                     }
                   });
@@ -366,17 +360,39 @@ class HomePage extends State<HomePageSend> {
                   });
                 }
                 });
-              }, child: Text('Oyun Ara', style: TextStyle(fontSize: 30))),
+              }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), icon: Icon(Icons.search), label: Text('Oyun Ara', style: TextStyle(fontSize: 30))),
               SizedBox(height: 25,),
-              ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) =>SetupPageSend(user: user)));
-              }, child: Text('Oyun Olustur', style: TextStyle(fontSize: 30))),
+              ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
+                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>SetupPageSend(user: user)));
+              }, icon: Icon(Icons.create), label: Text('Oyun Olustur', style: TextStyle(fontSize: 30))),
               SizedBox(height: 25,),
-              ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) =>AccountPageSend(user: user)));
-              }, child: Text('Hesabim', style: TextStyle(fontSize: 30))),
+              ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
+                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>AccountPageSend(user: user)));
+              }, icon: Icon(Icons.account_box), label: Text('Hesabim', style: TextStyle(fontSize: 30))),
             ],
           ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            showDialog(context: context, builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Yardim', textAlign: TextAlign.center,),
+                content: RichText(text: TextSpan(
+                  style: TextStyle(fontSize: 18.0, color: Colors.black),
+                  children: [
+                    TextSpan(text: '- Oyunu oynamak icin '),
+                    TextSpan(text: 'Oyun Ara ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: 'ile olusturulmus bir oyuna katilabilir ya da ', ),
+                    TextSpan(text: 'Oyun Olustur ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: 'ile single ve ya multiplayer oyun olusturulabilir.\n\n- Oyun basladiginda tahmin girilir ve '),
+                    TextSpan(text: 'Uygula', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: '\'ya basinca edilen tahmin, dogru tahmin edilen sayilar ve yanlis yerde olan sayilar altdaki listede gozukur.\n\n- Tum sayilar ve yerleri dogru tahmin edildiginde oyun kazanilir.\n\n- Skorlama secilen sayi hane sayisi, kazanmak icin alinan sure ve tahmin sayisi kullanilarak yapilir. '),
+                  ]
+                ),)
+              );
+            });
+          },
+          child: Icon(Icons.help),
         ),
       ),
     );
@@ -419,47 +435,47 @@ class AccountPage extends State<AccountPageSend>{
               padding: const EdgeInsets.all(8.0),
               child: FutureBuilder(future: getXp(), builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot){
                 if(snapshot.hasData){
-                  double xp = snapshot.data/500;
+                  double xp = snapshot.data/xpPerLevel;
                   int level = xp.toInt() + 1;
-                  xp /= 10;
-                  return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Colors.purple, minHeight: 50)), Padding( padding: const EdgeInsets.all(4.0), child: Center(child: Text('Seviye ' + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
+                  xp -= xp.toInt(); 
+                  return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Colors.purple, minHeight: 50)), Padding(padding: const EdgeInsets.all(4.0), child: Center(child: Text('Seviye ' + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
                 }
                 else
                   return LinearProgressIndicator(color: Colors.purple, minHeight: 50);
               }),
             ),
             SizedBox(height: 50,),
-            ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: (){
+            ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: (){
               Navigator.of(context).push(MaterialPageRoute(builder: (context) =>UpdatePageSend(user: this.user,)));
-            }, child: Text('Hesabi Guncelle', style: TextStyle(fontSize: 30))),
+            }, icon: Icon(Icons.update), label: Text('Hesabi Guncelle', style: TextStyle(fontSize: 30))),
             SizedBox(height: 50,),
-            ElevatedButton(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: () async{
+            ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: () async{
               return await showDialog(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: Center(child: Text("Hesabi Sil")),
-                    content: Center(child: Text('Hesabi silmek istediginize emin misiniz?')),
-                    actions: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton(
-                          child: Text('Hayir'),
-                          onPressed: () => Navigator.pop(c, false),
-                        ),
-                        SizedBox(width: 20,),
-                          ElevatedButton(
-                            child: Text('Evet'),
-                            onPressed: () {
-                              FirebaseFirestore.instance.collection('Users').doc(this.user!.email).delete();
-                              Navigator.of(context).push(MaterialPageRoute(builder: (context) =>InitialPageSend()));
-                            },
-                          ),  
-                        ],
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: Center(child: Text("Hesabi Sil")),
+                  content: Text('Hesabi silmek istediginize emin misiniz?', textAlign: TextAlign.center,),
+                  actions: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton(
+                        child: Text('Hayir'),
+                        onPressed: () => Navigator.pop(c, false),
                       ),
-                    ],
-                  ));
-            }, child: Text('Hesabi Sil', style: TextStyle(fontSize: 30))),          
+                      SizedBox(width: 20,),
+                        ElevatedButton(
+                          child: Text('Evet'),
+                          onPressed: () {
+                            FirebaseFirestore.instance.collection('Users').doc(this.user!.email).delete();
+                            Navigator.of(context).push(MaterialPageRoute(builder: (context) =>InitialPageSend()));
+                          },
+                        ),  
+                      ],
+                    ),
+                  ],
+              ));
+            }, icon: Icon(Icons.delete), label: Text('Hesabi Sil', style: TextStyle(fontSize: 30))),       
           ],
         ),
       ),
@@ -513,11 +529,12 @@ class UpdatePage extends State<UpdatePageSend>{
             ElevatedButton(onPressed: () async{
               if(email.text == this.user?.email){
                 FirebaseFirestore.instance.collection("Users").doc(email.text).update({'name': name.text, 'password': password.text});
-                ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('Hesap Guncellendi')));
+                ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('Hesap Guncellendi', textAlign: TextAlign.center)));
+                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>HomePageSend(user: user)));
               }
               else
-                ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('Email dogru girilmeli')));
-            }, child: Text('OK'))
+                ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('Email dogru girilmeli', textAlign: TextAlign.center)));
+            }, child: Text('Uygula'))
               ],
             ),
           )
@@ -573,6 +590,8 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
     }
     print(state);
   }
+  Color increasingColor = Colors.black38;
+  Color alertColor = Colors.transparent;
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -618,7 +637,25 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                 ),
               ),
               ListTile(
+                leading: Text('Sayi hane sayisi: ', style: TextStyle(fontSize: 24),),
+                trailing: DropdownButton<int>(
+                value: options.length,
+                items: [2, 3, 4, 5, 6, 7, 8, 9].map<DropdownMenuItem<int>>((int value) {
+                  return DropdownMenuItem<int>(
+                    value: value,
+                    child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
+                  );
+                }).toList(),
+                  onChanged: (int? value) {
+                    setState(() {
+                      options.length = value!;
+                    });
+                  },
+                ),
+              ),
+              ListTile(
                 leading: Text('Kac oyun uzerinden: ', style: TextStyle(fontSize: 24),),
+                tileColor: alertColor,
                 trailing: DropdownButton<int>(
                 value: options.bestOf,
                 items: [1, 3, 5].map<DropdownMenuItem<int>>((int value) {
@@ -629,32 +666,39 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                 }).toList(),
                   onChanged: (int? value) {
                     setState(() {
+                      if(value == 1){
+                        increasingColor = Colors.black38;
+                        options.increasingDiff = false;
+                      }
+                      else
+                        increasingColor = Colors.black;
                       options.bestOf = value!;
                     });
                   },
                 ),
               ),
-              ListTile(
-                leading: Text('Sayi hane sayisi: ', style: TextStyle(fontSize: 24),),
-                trailing: DropdownButton<int>(
-                value: selectedLength,
-                items: [2, 3, 4, 5, 6, 7, 8, 9].map<DropdownMenuItem<int>>((int value) {
-                  return DropdownMenuItem<int>(
-                    value: value,
-                    child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
-                  );
-                }).toList(),
-                  onChanged: (int? value) {
-                    setState(() {
-                      selectedLength = value!;
-                    });
-                  },
-                ),
+              CheckboxListTile(
+                title: Text("Zorlasan Mod", style: TextStyle(fontSize: 24, color: increasingColor)),
+                value: options.increasingDiff,
+                onChanged: (value) {
+                  setState(() {
+                    if(increasingColor != Colors.black38)
+                      options.increasingDiff = value!;
+                    else{                      
+                      alertColor = Theme.of(context).primaryColor;
+                      Future.delayed(new Duration(seconds: 1), (){       
+                        setState(() {
+                          alertColor = Colors.transparent;
+                        });   
+                      });
+                    }
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.trailing, 
               ),
-              ElevatedButton(
-                onPressed: () async{
+              ElevatedButton.icon(onPressed: (){
                   if(options.multiplayer){
-                    FirebaseFirestore.instance.collection('Rooms').doc(this.user!.email).set({'players': this.user!.email! + ', ', 'status': 'ready', 'won': '', 'bestOf': options.bestOf, 'duration': options.duration, 'roundInserted': false});
+                    FirebaseFirestore.instance.collection('Rooms').doc(this.user!.email).set({'players': this.user!.email! + ', ', 'length': options.length, 'status': 'ready', 'won': '', 'bestOf': options.bestOf, 'duration': options.duration, 'roundInserted': false, 'increasingDiff': options.increasingDiff});
                     DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email);
                     List<String> playersFound = new List.empty(growable: true);
                     showDialog(context: context,  barrierDismissible: false, builder: (BuildContext context) {
@@ -675,7 +719,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                               height: 125,
                               child: Column(
                                 children: [
-                                  Text((playersFound.length != 0?(playersFound.length - 2).toString():'0') + ' kisi bulundu...'),
+                                  Text((playersFound.length != 0?(playersFound.length - 2).toString():'0') + ' kisi bulundu...', textAlign: TextAlign.center,),
                                   SizedBox(height: 50,),
                                   CircularProgressIndicator(),
                                 ],
@@ -706,12 +750,10 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                     });  
                   }
                   else{
-                    FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email).set({'players': this.user!.email! + ", ", 'status': 'playing', 'won': '', 'bestOf': options.bestOf, 'roundInserted': false});
+                    FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email).set({'players': this.user!.email! + ", ", 'length': options.length, 'status': 'playing', 'won': '', 'bestOf': options.bestOf, 'roundInserted': false, 'increasingDiff': options.increasingDiff});
                 Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, this.user?.email, this.options)));
                   }   
-                },
-                style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                child: Text('Oyunu Baslat', style: TextStyle(fontSize: 30)))
+              }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(32)), icon: Icon(Icons.play_circle), label: Text('Oyunu Baslat', style: TextStyle(fontSize: 30)))
             ],
           ),
         ),
@@ -761,7 +803,7 @@ class GamePage extends State<GamePageSend> {
         DocumentReference doc = FirebaseFirestore.instance.collection("Users").doc(ret[i]);
         var document = await doc.get();
         int xp = document.get('xp');
-        ret[i] += (':' + xp.toString());
+        ret[i] += (':' + (xp~/xpPerLevel + 1).toString());
       }
     }
     return ret;
@@ -821,20 +863,23 @@ class GamePage extends State<GamePageSend> {
     return Text(randomNumber.toString(), style: TextStyle(fontSize: 32, color: Colors.green));
   }
   Widget displayResult(List<Map<String, dynamic>> userScore){
-    return DataTable(
-      columnSpacing: 40,
-        headingRowColor: MaterialStateColor.resolveWith((states) => Colors.black12),
-        headingRowHeight: 32,
-      columns: [
-        DataColumn(label: Text('Ad')),
-        DataColumn(label: Text('Skor')),
-      ],
-      rows: userScore.map<DataRow>((e) => DataRow(
-        cells: [
-          DataCell(Text(e['user'].toString())),
-          DataCell(Text(e['score'].toString())),
-        ]
-      )).toList(),
+    return Expanded(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+            headingRowColor: MaterialStateColor.resolveWith((states) => Colors.black12),
+          columns: [
+            DataColumn(label: Text('Ad')),
+            DataColumn(label: Text('Skor')),
+          ],
+          rows: userScore.map<DataRow>((e) => DataRow(
+            cells: [
+              DataCell(Text(e['user'].toString())),
+              DataCell(Text(e['score'].toString())),
+            ]
+          )).toList(),
+        ),
+      ),
     );
   }
   roundEnd() async {
@@ -854,11 +899,9 @@ class GamePage extends State<GamePageSend> {
             return StatefulBuilder(builder: (context, setState) {
               if(cd != 0)
                 Timer.periodic(new Duration(seconds: 1), (timer) { 
-                  print(cd.toString());
                   if(cd == 0){
                     timer.cancel();
                     cd = -1;
-                    print(this.otherPlayers.toString());
                     Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, this.room, this.options)));
                   }
                   else if(cd  < 0)
@@ -870,7 +913,7 @@ class GamePage extends State<GamePageSend> {
                 });
               return AlertDialog(
                 title: Center(child: Text("Round Sonu")),
-                content: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Center(child: displayNumber(),), SizedBox(height: 100,), Center(child: Text('Sonraki round ' + cd.toString() + ' saniye icinde basliyor')),],),
+                content: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Center(child: displayNumber(),), SizedBox(height: 100,), Center(child: Text('Sonraki round ' + cd.toString() + ' saniye icinde basliyor', textAlign: TextAlign.center),),],),
                 actions: <Widget>[
                     ElevatedButton(onPressed: (){
                       leaveGame();
@@ -881,26 +924,26 @@ class GamePage extends State<GamePageSend> {
               );
             });
         });
-    else if(wins==''){
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Center(child: Text("Oyun Sonuclari")),
-            content: Column(mainAxisAlignment: MainAxisAlignment.center, children: [displayNumber(), SizedBox(height: 100,), Center(child: Text('Kimse Kazanamadi')),],),
-            actions: <Widget>[
-              ElevatedButton(onPressed: (){
-                Navigator.pop(context);
-              },child: Center(child: Text("Geri"))),
-              ElevatedButton(onPressed: (){
-                leaveGame();
-                Navigator.pop(context);
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>HomePageSend(user: this.user)));
-              },child: Center(child: Text("Oyundan Cik"))),
-            ],
-          );
-      });
-    }
+    // else if(wins==''){
+    //   showDialog(
+    //     context: context,
+    //     builder: (BuildContext context) {
+    //       return AlertDialog(
+    //         title: Center(child: Text("Oyun Sonuclari")),
+    //         content: Column(mainAxisAlignment: MainAxisAlignment.center, children: [displayNumber(), SizedBox(height: 100,), Center(child: Text('Kimse Kazanamadi', textAlign: TextAlign.center,)),],),
+    //         actions: <Widget>[
+    //           ElevatedButton(onPressed: (){
+    //             Navigator.pop(context);
+    //           },child: Center(child: Text("Geri"))),
+    //           ElevatedButton(onPressed: (){
+    //             leaveGame();
+    //             Navigator.pop(context);
+    //             Navigator.of(context).push(MaterialPageRoute(builder: (context) =>HomePageSend(user: this.user)));
+    //           },child: Center(child: Text("Oyundan Cik"))),
+    //         ],
+    //       );
+    //   });
+    // }
     else{
       List<String> gameWs = wins.split('-');
       List<Map<String, dynamic>> userScoreTmp = List.empty(growable: true);      
@@ -937,8 +980,12 @@ class GamePage extends State<GamePageSend> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Center(child: Text("Oyun Sonuclari")),
-            content: Column(mainAxisAlignment: MainAxisAlignment.center,children: [displayNumber(), SizedBox(height: 50,), displayResult(userScore)]),//  xText(results, style: TextStyle(fontSize: 24),)]),
+            contentPadding: EdgeInsets.zero,
+            title: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 25),
+              child: Center(child: Text("Oyun Sonuclari")),
+            ),
+            content: Column(children: [displayNumber(), SizedBox(height: 25,), displayResult(userScore)]),
             actions: <Widget>[
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -967,28 +1014,56 @@ class GamePage extends State<GamePageSend> {
     var document = await doc.get();
     if(!document.exists)return;
     var inserted = document.get('roundInserted');
-    var wins = document.get('won');
-    roundCounter = wins.split('-').length;
     if(!inserted){
-      await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'number': findRandom(selectedLength), 'won': wins + '-', 'roundInserted': true});
+      var wins = document.get('won');
+      bool increasingDiff = document.get('increasingDiff');
+      print("?" + increasingDiff.toString() +" and " + options!.length.toString());
+      roundCounter = wins.split('-').length;
+      await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'number': findRandom(options?.length), 'won': wins + '-', 'roundInserted': true});
+      if(increasingDiff)options?.length++;
+      await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'length': options?.length});
     }
+    else
+      options?.length = document.get('length');
     initializeNumber();
   }
-  @override
-  void initState(){
-    insertRound();
-    currentDuration = options!.duration;
-    timerSeconds = new Timer.periodic(Duration(seconds: 1),  (Timer timer) {
+  Future<bool> allWon() async{
+    DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.room);
+    var document = await doc.get();
+    List<String> wins = document.get('won').split('-');
+    var currentWins = wins[wins.length - 1];
+    if(currentWins != ''){
+      List<String> players = await findPlayers(false);
+      if(currentWins.split(', ').length - 1 >= players.length)
+        return true;
+    }
+    return false;
+  }
+  void startTimer() async{
+  timerSeconds = new Timer.periodic(Duration(seconds: 1),  (Timer timer) async {
       if(currentDuration < 1){
           timer.cancel();
           roundEnd();
       }
       else{
-        setState(() {
-          currentDuration--;
-        });
-      }
+        bool allDone = await allWon();  
+        if(allDone){
+          timer.cancel();
+          roundEnd();
+        }
+        else{
+          setState(() {
+            currentDuration--;
+          });
+        }
+      }  
     });
+  }
+  @override
+  void initState(){
+    insertRound();
+    currentDuration = options!.duration;
+    startTimer();
     super.initState();
   }
   void leaveGame() async{
@@ -997,10 +1072,10 @@ class GamePage extends State<GamePageSend> {
       DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.room);
       var document = await doc.get();
       if(document.exists){
-        List<String> players = document.get('players').split(', ');
-        if(players.length < 3)
-          FirebaseFirestore.instance.collection('Rooms').doc(this.room).delete();
+        if(this.user?.email == this.room)
+            FirebaseFirestore.instance.collection('Rooms').doc(this.room).delete();
         else{
+          List<String> players = document.get('players').split(', ');
           String newPlayers = "";
           for(int i=0;i<players.length - 1;i++)
             if(players[i] != this.user?.email)
@@ -1058,15 +1133,15 @@ class GamePage extends State<GamePageSend> {
                         padding: const EdgeInsets.fromLTRB(20, 5, 20, 0),
                         child: FutureBuilder(builder: (BuildContext context, AsyncSnapshot<List<String>> snapshot){
                           return snapshot.hasData?Container(
-                            height: 50,
-                            width: 50,                                               
+                            height: 75,
+                            width: 25,                                               
                             child: ListView.builder(scrollDirection: Axis.horizontal,
                             shrinkWrap: true,itemBuilder: (BuildContext context, int idx){
                               var userXp = snapshot.data![idx].split(':');
                               var user = userXp[0];
                               var xp = userXp[1];
                               if(user != this.user!.email)
-                                return Column(children: [Container(width: 25, height: 25, child: Image.asset('assets/account.png')), Text(xp), Text(user)],) ;
+                                return Column(children: [Center(child: Text(xp, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 14))), Container(width: 25, height: 25, child: Image.asset('assets/account.png')), Text(user)],) ;
                               return Container();
                             }, itemCount: snapshot.data?.length),
                           ):Container();
