@@ -16,6 +16,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 int randomNumber = 0, xpPerLevel = 100, selectedBottomIdx = 0;
 Timer? timerSeconds, timerPlayers;
@@ -257,6 +258,12 @@ class InitialPageSend extends StatefulWidget {
     return InitialPage();
   }
 }
+void checkNetwork(BuildContext context)async{
+  var connectivityResult = await (Connectivity().checkConnectivity());
+  if (connectivityResult != ConnectivityResult.mobile && connectivityResult != ConnectivityResult.wifi) {
+    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text("noInternet".tr().toString())));
+  }
+}
 class InitialPage extends State<InitialPageSend>{
   @override
   Widget build(BuildContext context) {
@@ -463,7 +470,8 @@ class LoginEmailPage extends State<LoginEmailPageSend>{
 void joinDialog(BuildContext context, String foundRoom, String currentPlayers, Users user) async{
   List<String> playersFound = new List.empty(growable: true);
   DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(foundRoom);
-  Timer.periodic(new Duration(seconds: 1), (timer) async{
+  Timer.periodic(new Duration(seconds: 1), (timer) async{ 
+                          print("a");
     var document = await doc.get();
     if(!document.exists){
       timer.cancel();
@@ -473,14 +481,16 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers, U
       var document = await doc.get();
       Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, foundRoom, new Options(multiplayer: true, duration: document.get('duration'), bestOf: document.get('bestOf'), increasingDiff: document.get('increasingDiff'), length: document.get('length')))));
       timer.cancel();
+      timerPlayers?.cancel();
     }
   });
   FirebaseFirestore.instance.collection('Rooms').doc(foundRoom).update({'players': currentPlayers + user.name! + ', '});
   showDialog(context: context,  barrierDismissible: false, builder: (BuildContext context) {
     return StatefulBuilder(builder: (context, setState) {
         timerPlayers = Timer.periodic(new Duration(seconds: 1), (timer) async{
+                          print("b");
           var document = await doc.get();
-          if(document.exists)  
+          if(document.exists && document.get('status') == 'ready')  
             setState(() {
               playersFound = document.get('players').split(', ');                
             });
@@ -522,144 +532,6 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers, U
       );
     });
   });
-}
-
-class HomePageSend extends StatefulWidget {
-  final Users? user;
-  HomePageSend({@required this.user});
-  @override
-  State<StatefulWidget> createState() {
-    return HomePage(this.user);
-  }
-}
-class HomePage extends State<HomePageSend> {
-  Users? user;
-  Timer? searchTimer;
-  int selectedIdx = 0;
-  HomePage(this.user);
-  @override
-  void initState() {
-    if(configuration == null)
-      configuration = new Configuration(this.user!.settings!);
-    super.initState();
-  }
-  @override
-  Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async{
-          showDialog<bool>(
-            context: context,
-            builder: (c) => AlertDialog(
-              title: Center(child: Text('alert'.tr().toString())),
-              content: Text('alertLogout'.tr().toString()),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton(
-                      child: Text('no'.tr().toString()),
-                      onPressed: () => Navigator.pop(c, false),
-                    ),
-                    SizedBox(width: 10,),
-                    ElevatedButton(
-                      child: Text('yes'.tr().toString()),
-                      onPressed: () async{
-                        await context.read<AuthenticationServices>().signOut();
-                        Navigator.pop(c, false);
-                        Navigator.of(context).push(MaterialPageRoute(builder: (context) => InitialPageSend()));
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-          return false;
-      },
-      child: Scaffold(
-        bottomNavigationBar: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          items: bottomNavItems(),
-          currentIndex: selectedBottomIdx,
-          onTap: (int tappedIdx){
-            if(selectedBottomIdx == tappedIdx)return;
-            setState(() {
-              selectedBottomIdx = tappedIdx;
-            });
-            navigateBottom(context, this.user!);
-          },
-        ),
-        resizeToAvoidBottomInset: false,
-        appBar: AppBar(title: Text('home'.tr().toString()),centerTitle: true,),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(onPressed: ()async{   
-                bool searching = false;
-                var foundRoom, currentPlayers;
-                searchTimer = Timer.periodic(new Duration(seconds: 1), (timer) async{
-                  await FirebaseFirestore.instance.collection("Rooms").get().then((value) {
-                    value.docs.forEach((result) {
-                      if(result.get('status') == 'ready'){
-                        timer.cancel();
-                        foundRoom = result.id;
-                        currentPlayers = result.get('players');
-                      }
-                    });
-                  });  
-                if(foundRoom != null){
-                  joinDialog(context, foundRoom, currentPlayers, this.user!);
-                }  
-                else if(!searching){
-                  searching = true;
-                  showDialog(context: context,  barrierDismissible: false, builder: (BuildContext context) {
-                    return StatefulBuilder(builder: (context, setState) {
-                      return AlertDialog(
-                          title: Center(child: Text("search".tr().toString(),)),
-                          content: Container(
-                            height: 125,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            ElevatedButton(onPressed: () async{
-                              searchTimer?.cancel();
-                              Navigator.pop(context);
-                              }, child:  Center(child: Text('abort'.tr().toString()))),
-                          ],
-                      );
-                    });
-                  });
-                }
-                });
-              }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), icon: Icon(Icons.quickreply ), label: Text('quickJoinBtn'.tr().toString(), style: TextStyle(fontSize: 30))),
-              SizedBox(height: 25,),
-              ElevatedButton.icon(onPressed: ()async{   
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>JoinGamePageSend(user: this.user,)));
-              }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), icon: Icon(Icons.search), label: Text('joinBtn'.tr().toString(), style: TextStyle(fontSize: 30))),
-              SizedBox(height: 25,),
-              ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>SetupPageSend(user: user)));
-              }, icon: Icon(Icons.create), label: Text('createBtn'.tr().toString(), style: TextStyle(fontSize: 30))),
-              SizedBox(height: 25,),
-              ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>AccountPageSend(user: user)));
-              }, icon: Icon(Icons.account_box), label: Text('account'.tr().toString(), style: TextStyle(fontSize: 30))),
-              SizedBox(height: 25,),
-              ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: (){
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>SettingsPageSend(user: user)));
-              }, icon: Icon(Icons.settings), label: Text('settings'.tr().toString(), style: TextStyle(fontSize: 30))),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 Future<bool> logout(BuildContext context)async{
@@ -708,6 +580,7 @@ class SearchPage extends State<SearchPageSend> {
   SearchPage(this.user);
   @override
   void initState() {
+    checkNetwork(context);
     if(configuration == null)
       configuration = new Configuration(this.user!.settings!);
     super.initState();
@@ -770,6 +643,7 @@ class SearchPage extends State<SearchPageSend> {
                 bool searching = false;
                 var foundRoom, currentPlayers;
                 searchTimer = Timer.periodic(new Duration(seconds: 1), (timer) async{
+                          print("e");
                   await FirebaseFirestore.instance.collection("Rooms").get().then((value) {
                     value.docs.forEach((result) {
                       if(result.get('status') == 'ready'){
@@ -808,7 +682,7 @@ class SearchPage extends State<SearchPageSend> {
                   });
                 }
                 });
-              }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), icon: Icon(Icons.quickreply ), label: Text('quickJoinBtn'.tr().toString(), style: TextStyle(fontSize: 30))),
+              }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), icon: Icon(Icons.speed_rounded ), label: Text('quickJoinBtn'.tr().toString(), style: TextStyle(fontSize: 30))),
               SizedBox(height: 25,),
               ElevatedButton.icon(onPressed: ()async{   
                 Navigator.of(context).push(MaterialPageRoute(builder: (context) =>JoinGamePageSend(user: this.user,)));
@@ -843,6 +717,7 @@ class JoinGamePage extends State<JoinGamePageSend>{
   @override
   void initState() {
     searchTimer = Timer.periodic(new Duration(seconds: 3), (timer) async{
+                          print("f");
       List<Room> tmp=  List.empty(growable: true);
       roomsFound = List.empty(growable: true);
       await FirebaseFirestore.instance.collection("Rooms").get().then((value) {
@@ -860,43 +735,49 @@ class JoinGamePage extends State<JoinGamePageSend>{
   }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      appBar: AppBar(title: Text('search'.tr().toString()),centerTitle: true,),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 25, 10, 10),
-            child: LinearProgressIndicator(),
-          ),
-          FittedBox(
-            fit: BoxFit.fitWidth,
-            child: DataTable(
-              showCheckboxColumn: false,
-              columns: [
-                DataColumn(label: Text('creator'.tr().toString())),
-                DataColumn(label: Text('playerCount'.tr().toString())),
-                DataColumn(label: Text('time'.tr().toString())),
-                DataColumn(label: Text('digit'.tr().toString())),
-                DataColumn(label: Text('bestOf'.tr().toString())),
-              ],
-            rows: roomsFound.map<DataRow>((e) => DataRow(
-              onSelectChanged: (selected){
-                searchTimer?.cancel();
-                joinDialog(context, e.creator, e.currentPlayers, this.user!);
-              },
-              cells: [
-                DataCell(Text(e.currentPlayers.split(', ')[0].toString(), textAlign: TextAlign.center,)),
-                DataCell(Text((e.currentPlayers.split(', ').length - 1).toString(), textAlign: TextAlign.center,)),
-                DataCell(Text(e.time.toString(), textAlign: TextAlign.center,)),
-                DataCell(Text(e.digit.toString(), textAlign: TextAlign.center,)),
-                DataCell(Text(e.bestOf.toString(), textAlign: TextAlign.center,)),
-              ]
-            )).toList(),
+    return WillPopScope(
+      onWillPop: ()async{
+        searchTimer?.cancel();
+        return true;
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        appBar: AppBar(title: Text('search'.tr().toString()),centerTitle: true,),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 25, 10, 10),
+              child: LinearProgressIndicator(),
             ),
-          ),
-        ],
-      )
+            FittedBox(
+              fit: BoxFit.fitWidth,
+              child: DataTable(
+                showCheckboxColumn: false,
+                columns: [
+                  DataColumn(label: Text('creator'.tr().toString())),
+                  DataColumn(label: Text('playerCount'.tr().toString())),
+                  DataColumn(label: Text('time'.tr().toString())),
+                  DataColumn(label: Text('digit'.tr().toString())),
+                  DataColumn(label: Text('bestOf'.tr().toString())),
+                ],
+              rows: roomsFound.map<DataRow>((e) => DataRow(
+                onSelectChanged: (selected){
+                  searchTimer?.cancel();
+                  joinDialog(context, e.creator, e.currentPlayers, this.user!);
+                },
+                cells: [
+                  DataCell(Text(e.currentPlayers.split(', ')[0].toString(), textAlign: TextAlign.center,)),
+                  DataCell(Text((e.currentPlayers.split(', ').length - 1).toString(), textAlign: TextAlign.center,)),
+                  DataCell(Text(e.time.toString(), textAlign: TextAlign.center,)),
+                  DataCell(Text(e.digit.toString(), textAlign: TextAlign.center,)),
+                  DataCell(Text(e.bestOf.toString(), textAlign: TextAlign.center,)),
+                ]
+              )).toList(),
+              ),
+            ),
+          ],
+        )
+      ),
     );
   }
 }
@@ -938,7 +819,12 @@ class AccountPage extends State<AccountPageSend>{
             navigateBottom(context, this.user!);
           },
         ),
-        appBar: AppBar(leading: Container(), title: Text('account'.tr().toString()),centerTitle: true,
+        appBar: AppBar(
+          leadingWidth: 60,
+          leading: ElevatedButton.icon(label: Text(""), icon: Icon(Icons.logout_rounded), onPressed: (){
+            logout(context);
+          },),
+          title: Text('account'.tr().toString()),centerTitle: true,
           actions: [
             Padding(
               padding: const EdgeInsets.fromLTRB(0, 20, 10, 15),
@@ -952,74 +838,66 @@ class AccountPage extends State<AccountPageSend>{
             ),
           ],
         ),
-        body: Center(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 50, 20, 0),
-                  child: Text(this.user!.name!, textAlign: TextAlign.center, style: TextStyle(fontSize: 48),),
-                ),
-                SizedBox(height: 50,),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  child: FutureBuilder(future: getXp(), builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot){
-                    if(snapshot.hasData){
-                      double xp = snapshot.data/xpPerLevel;
-                      int level = xp.toInt() + 1;
-                      xp -= xp.toInt(); 
-                      return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Colors.purple, minHeight: 50)), Padding(padding: const EdgeInsets.all(4.0), child: Center(child: Text('level'.tr().toString() + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
-                    }
-                    else
-                      return LinearProgressIndicator(color: Colors.purple, minHeight: 50);
-                  }),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: (){
-                    Navigator.of(context).push(MaterialPageRoute(builder: (context) =>UpdatePageSend(user: this.user,)));
-                  }, icon: Icon(Icons.update), label: Text('update'.tr().toString(), style: TextStyle(fontSize: 30))),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),  onPressed: ()async{
-                    logout(context);
-                  }, icon: Icon(Icons.logout_rounded), label: Text('signOut'.tr().toString(), style: TextStyle(fontSize: 30))),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: () async{
-                    return await showDialog(
-                      context: context,
-                      builder: (c) => AlertDialog(
-                        title: Center(child: Text("delete".tr().toString())),
-                        content: Text('alertDelete'.tr().toString(), textAlign: TextAlign.center,),
-                        actions: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ElevatedButton(
-                              child: Text('no'.tr().toString()),
-                              onPressed: () => Navigator.pop(c, false),
-                            ),
-                            SizedBox(width: 20,),
-                              ElevatedButton(
-                                child: Text('yes'.tr().toString()),
-                                onPressed: () async{
-                                  await context.read<AuthenticationServices>().delete(email: this.user!.email, password: this.user!.password);
-                                  FirebaseFirestore.instance.collection('Users').doc(this.user!.email).delete();
-                                  Navigator.of(context).push(MaterialPageRoute(builder: (context) =>InitialPageSend()));
-                                },
-                              ),  
-                            ],
+        body: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Text(this.user!.name!, textAlign: TextAlign.center, style: TextStyle(fontSize: 48),),
+              ),
+              SizedBox(height: 50,),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                child: FutureBuilder(future: getXp(), builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot){
+                  if(snapshot.hasData){
+                    double xp = snapshot.data/xpPerLevel;
+                    int level = xp.toInt() + 1;
+                    xp -= xp.toInt(); 
+                    return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Colors.purple, minHeight: 50)), Padding(padding: const EdgeInsets.all(4.0), child: Center(child: Text('level'.tr().toString() + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
+                  }
+                  else
+                    return LinearProgressIndicator(color: Colors.purple, minHeight: 50);
+                }),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),onPressed: (){
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) =>UpdatePageSend(user: this.user,)));
+                }, icon: Icon(Icons.update), label: Text('update'.tr().toString(), style: TextStyle(fontSize: 30))),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton.icon(style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)), onPressed: () async{
+                  return await showDialog(
+                    context: context,
+                    builder: (c) => AlertDialog(
+                      title: Center(child: Text("delete".tr().toString())),
+                      content: Text('alertDelete'.tr().toString(), textAlign: TextAlign.center,),
+                      actions: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton(
+                            child: Text('no'.tr().toString()),
+                            onPressed: () => Navigator.pop(c, false),
                           ),
-                        ],
-                    ));
-                  }, icon: Icon(Icons.delete), label: Text('delete'.tr().toString(), style: TextStyle(fontSize: 30))),
-                ),       
-              ],
-            ),
+                          SizedBox(width: 20,),
+                            ElevatedButton(
+                              child: Text('yes'.tr().toString()),
+                              onPressed: () async{
+                                await context.read<AuthenticationServices>().delete(email: this.user!.email, password: this.user!.password);
+                                FirebaseFirestore.instance.collection('Users').doc(this.user!.email).delete();
+                                Navigator.of(context).push(MaterialPageRoute(builder: (context) =>InitialPageSend()));
+                              },
+                            ),  
+                          ],
+                        ),
+                      ],
+                  ));
+                }, icon: Icon(Icons.delete), label: Text('delete'.tr().toString(), style: TextStyle(fontSize: 30))),
+              ),       
+            ],
           ),
         ),
       ),
@@ -1125,7 +1003,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
   }
   @override
   void dispose() {
-        WidgetsBinding.instance?.removeObserver(this);
+    WidgetsBinding.instance?.removeObserver(this);
     super.dispose();
   }
   int secondsPaused = 0;
@@ -1137,6 +1015,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
       var document = await doc.get();
       if(document.exists && document.get('status') == 'ready')
         inactiveTimer = Timer.periodic(new Duration(seconds: 1), (timer) {
+                          print("x");
           if(secondsPaused > 5){
             FirebaseFirestore.instance.collection('Rooms').doc(this.user!.email).delete();
             toMainPage(context, user!);
@@ -1300,7 +1179,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                     return StatefulBuilder(builder: (context, setState) {
                         timerPlayers = Timer.periodic(new Duration(seconds: 5), (timer) async{
                           var document = await doc.get();
-                          if(document.exists)
+                          if(document.exists && document.get('status') == 'ready')
                             setState(() {
                               playersFound = document.get('players').split(', ');       
                               btnStartColor = playersFound.length > 2?Theme.of(context).primaryColor:Colors.grey;            
@@ -1511,6 +1390,7 @@ class GamePage extends State<GamePageSend> {
           return StatefulBuilder(builder: (context, setState) {
             if(cd != 0)
               Timer.periodic(new Duration(seconds: 1), (timer) { 
+                print(cd);
                 if(cd == 0){
                   timer.cancel();
                   cd = -1;
@@ -1527,11 +1407,11 @@ class GamePage extends State<GamePageSend> {
               title: Center(child: Text("endRound".tr().toString())),
               content: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Center(child: displayNumber(),), SizedBox(height: 100,), Center(child: Text('nextRound'.tr().toString() + cd.toString(), textAlign: TextAlign.center),),],),
               actions: <Widget>[
-                  ElevatedButton(onPressed: (){
-                    leaveGame();
-                    Navigator.pop(context);
-                    toMainPage(context, this.user!);
-                  },child: Center(child: Text("leave".tr().toString()))),           
+                ElevatedButton(onPressed: (){
+                  leaveGame();
+                  Navigator.pop(context);
+                  toMainPage(context, this.user!);
+                },child: Center(child: Text("leave".tr().toString()))),           
               ],
             );
           });
@@ -1605,10 +1485,11 @@ class GamePage extends State<GamePageSend> {
     if(!document.exists)return;
     var inserted = document.get('roundInserted');
     if(!inserted){
+      FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'roundInserted': true});
       var wins = document.get('won');
       bool increasingDiff = document.get('increasingDiff');
       roundCounter = wins.split('-').length;
-      await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'number': findRandom(options?.length), 'won': wins + '-', 'roundInserted': true});
+      await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'number': findRandom(options?.length), 'won': wins + '-'});
       if(increasingDiff)options?.length++;
       await FirebaseFirestore.instance.collection("Rooms").doc(this.room).update({'length': options?.length});
     }
@@ -1630,6 +1511,7 @@ class GamePage extends State<GamePageSend> {
   }
   void startTimer() async{
     timerSeconds = new Timer.periodic(Duration(seconds: 1),  (Timer timer) async {
+      print("z");
       if(currentDuration < 1){
           timer.cancel();
           roundEnd();
@@ -1637,6 +1519,7 @@ class GamePage extends State<GamePageSend> {
       else{
         bool allDone = await allWon();  
         if(allDone){
+          timerPlayers?.cancel();
           timer.cancel();
           roundEnd();
         }
@@ -1784,7 +1667,7 @@ class GamePage extends State<GamePageSend> {
                               String user = userDone[0];
                               int done = int.parse(userDone[1]);
                               if(user != this.user!.name)
-                                return Column(children: [Stack(alignment: Alignment.topCenter, children: [Container(width: 25, height: 25, child: Image.asset('assets/imgs/account.png')), done==0?Container(width: 25, child: LinearProgressIndicator()):Icon(Icons.done, color: Theme.of(context).primaryColor,) ],) , Text(user)],) ;
+                                return FittedBox(fit: BoxFit.fitHeight, child: Column(children: [done==0?Container(width: 25, child: LinearProgressIndicator()):Icon(Icons.done, color: Theme.of(context).primaryColor,), Container(width: 25, height: 25, child: Image.asset('assets/imgs/account.png')), Text(user)],)) ;
                               return Container();
                             }, itemCount: snapshot.data?.length),
                           ):Container();
