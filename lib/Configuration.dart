@@ -113,24 +113,6 @@ class SettingsPage extends State<SettingsPageSend>{
                 },
                 controlAffinity: ListTileControlAffinity.trailing, 
               ),
-            // ListTile(
-            //   leading: Text('soundEffects'.tr().toString(), style: TextStyle(fontSize: 24),),
-            //   trailing: DropdownButton<String>(
-            //   value: lang,
-            //   items: ['en', 'tr'].map<DropdownMenuItem<String>>((String value) {
-            //     return DropdownMenuItem<String>(
-            //       value: value,
-            //       child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
-            //     );
-            //   }).toList(),
-            //     onChanged: (String? value) {
-            //       setState(() {
-            //         lang = value!;
-            //         FirebaseFirestore.instance.collection('Users').doc(this.user?.email).update({'language': lang});
-            //       });
-            //     },
-            //   ),
-            // ),
           ],
         ),
       ),
