@@ -1116,9 +1116,6 @@ int findRandom(int? length){
     }
     print("RET " + ret);
     return int.parse(ret);
-    // int min = pow(10, length - 1).toInt();
-    // int max = pow(10, length).toInt();
-    // return min + Random().nextInt(max - min);
   }
   return 0;
 }
