@@ -76,9 +76,6 @@ class MyApp extends StatelessWidget{
         debugShowCheckedModeBanner: false,
         title:  'Sayi Bulmaca',
         theme: ThemeData(
-          // accentColor: Colors.white,
-          //textTheme: TextTheme(bodyText1: TextStyle(), bodyText2: TextStyle(),).apply(bodyColor: Colors.white),
-          // scaffoldBackgroundColor: Colors.orangeAccent[100],
           bottomNavigationBarTheme: BottomNavigationBarThemeData(backgroundColor: Colors.pink, selectedItemColor: Colors.tealAccent, unselectedItemColor: Colors.white),
           primarySwatch: Colors.pink,
         ),
