@@ -363,7 +363,7 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers, U
     }
     if(document.get('status') == 'playing'){
       var document = await doc.get();
-      Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, foundRoom, new Options(multiplayer: true, duration: document.get('duration'), bestOf: document.get('bestOf'), increasingDiff: document.get('increasingDiff'), length: document.get('length')))));
+      Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, foundRoom, new Options(game: document.get('game'), multiplayer: true, duration: document.get('duration'), bestOf: document.get('bestOf'), increasingDiff: document.get('increasingDiff'), length: document.get('length')))));
       timer.cancel();
       timerPlayers?.cancel();
     }
@@ -976,13 +976,13 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
             ListTile(
               leading: Text('digitLength'.tr().toString(), style: TextStyle(fontSize: 24),),
               trailing: DropdownButton<int>(
-              value: options.length,
-              items: [2, 3, 4, 5, 6, 7, 8, 9].map<DropdownMenuItem<int>>((int value) {
-                return DropdownMenuItem<int>(
-                  value: value,
-                  child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
-                );
-              }).toList(),
+                value: options.length,
+                items: [2, 3, 4, 5, 6, 7, 8, 9].map<DropdownMenuItem<int>>((int value) {
+                  return DropdownMenuItem<int>(
+                    value: value,
+                    child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
+                  );
+                }).toList(),
                 onChanged: (int? value) {
                   setState(() {
                     options.length = value!;
@@ -1035,7 +1035,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
             ),
             ElevatedButton.icon(onPressed: (){
                 if(options.multiplayer){
-                  FirebaseFirestore.instance.collection('Rooms').doc(this.user!.email).set({'players': this.user!.name! + ', ', 'length': options.length, 'status': 'ready', 'won': '', 'bestOf': options.bestOf, 'duration': options.duration, 'roundInserted': false, 'increasingDiff': options.increasingDiff});
+                  FirebaseFirestore.instance.collection('Rooms').doc(this.user!.email).set({'players': this.user!.name! + ', ', 'game': options.game, 'length': options.length, 'status': 'ready', 'won': '', 'bestOf': options.bestOf, 'duration': options.duration, 'roundInserted': false, 'increasingDiff': options.increasingDiff});
                   DocumentReference doc = FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email);
                   List<String> playersFound = new List.empty(growable: true);
                   showDialog(context: context,  barrierDismissible: false, builder: (BuildContext context) {
@@ -1087,7 +1087,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                   });  
                 }
                 else{
-                  FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email).set({'players': this.user!.name! + ", ", 'length': options.length, 'status': 'playing', 'won': '', 'bestOf': options.bestOf, 'roundInserted': false, 'increasingDiff': options.increasingDiff});
+                  FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email).set({'players': this.user!.name! + ", ",'game': options.game, 'length': options.length, 'status': 'playing', 'won': '', 'bestOf': options.bestOf, 'roundInserted': false, 'increasingDiff': options.increasingDiff});
               Navigator.of(context).push(MaterialPageRoute(builder: (context) =>GamePageSend(user, this.user?.email, this.options)));
                 }   
             }, style: ElevatedButton.styleFrom(padding: EdgeInsets.all(32)), icon: Icon(Icons.play_circle), label: Text('start'.tr().toString(), style: TextStyle(fontSize: 30)))
