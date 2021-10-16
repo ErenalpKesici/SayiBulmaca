@@ -1501,10 +1501,7 @@ class GamePage extends State<GamePageSend> {
                           hinted = true;
                           continue;
                         }
-                        // if(tmpRandom[i] == entryList[0].tahmin[i])
-                        //   addHint += ' ' + tmpRandom[i];
-                        // else
-                          addHint += ' _';
+                        addHint += ' _';
                       }
                     }
                     else{
