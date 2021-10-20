@@ -921,20 +921,20 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
         },
       ),
         appBar: AppBar(
-          leading: DropdownButton<String>(
-            value: options.game,
-            items: ['guess', 'another'].map<DropdownMenuItem<String>>((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value.toString()),
-              );
-            }).toList(),
-            onChanged: (String? value) {
-              setState(() {
-                options.game = value!;
-              });
-            },
-          ),
+          // leading: DropdownButton<String>(
+          //   value: options.game,
+          //   items: ['guess', 'another'].map<DropdownMenuItem<String>>((String value) {
+          //     return DropdownMenuItem<String>(
+          //       value: value,
+          //       child: Text(value.toString()),
+          //     );
+          //   }).toList(),
+          //   onChanged: (String? value) {
+          //     setState(() {
+          //       options.game = value!;
+          //     });
+          //   },
+          // ),
           centerTitle: true,
           title: Text("createBtn".tr().toString()),
           actions: [
