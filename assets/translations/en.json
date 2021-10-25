@@ -55,7 +55,7 @@
     "helpScreenInfo2": "To create your own game, tap Create Game in the bottom navigation bar and select the options you want.\nMultiplayer: Enables playing with other players.\nTime: Maximum amount of time before the game is over.\nDigit Length: Length of the number trying to be guessed (longer the harder).\nRound: Out of how many rounds the game is.\nIncreasing Difficulty: Can only be enabled with multiple rounds selected, increases difficulty each round.",
     "helpScreenImg2": "assets/imgs/help/enHelp2.png",
     "helpScreenTitle3": "How to Play the Game",
-    "helpScreenInfo3": "The objective of the game is to guess the randomally generated number within a time limit.\nAfter a guess is entered, whichever digits are right in the right place (+) and whichever are right but in the wrong place (-) are shown in the table below.\nIf you guess it right you win the game.\nYou'll get scored according to time taken, number of guesses and the difficulty (number length).\nIf stuck, a not-found digit can be revealed by spending 100 credits from the button on top-right.",
+    "helpScreenInfo3": "The objective of the game is to guess the randomly generated number within a time limit.\nAfter a guess is entered, whichever digits are right in the right place (+) and whichever are right but in the wrong place (-) are shown in the table below.\nIf you guess it right you win the game.\nYou'll get scored according to time taken, number of guesses and the difficulty (number length).\nIf stuck, a not-found digit can be revealed by spending 100 credits from the button on top-right.",
     "helpScreenImg3": "assets/imgs/help/enHelp3.png",
     "time": "Time ",
     "digit": "Digits",

@@ -76,6 +76,8 @@ class MyApp extends StatelessWidget{
         debugShowCheckedModeBanner: false,
         title:  'Sayi Bulmaca',
         theme: ThemeData(
+          brightness: SchedulerBinding.instance!.window.platformBrightness,
+          appBarTheme: AppBarTheme(backgroundColor: Colors.pink),
           bottomNavigationBarTheme: BottomNavigationBarThemeData(backgroundColor: Colors.pink, selectedItemColor: Colors.tealAccent, unselectedItemColor: Colors.white),
           primarySwatch: Colors.pink,
         ),
@@ -157,7 +159,7 @@ class InitialPage extends State<InitialPageSend>{
                 ),
               ),
             ),
-             ElevatedButton(onPressed: () async{
+             ElevatedButton.icon(icon: Icon(Icons.login), label: Text("login".tr().toString()), onPressed: () async{
               if(email.text != "" && password.text != ""){
                 email.text = email.text.trim();
                 password.text = password.text.trim();
@@ -182,7 +184,7 @@ class InitialPage extends State<InitialPageSend>{
                 else
                     ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('alertWrong'.tr().toString())));
               }
-            }, child: Text('login'.tr().toString())),
+            }),
             SizedBox(height: 25,),
             ElevatedButton.icon(style: ElevatedButton.styleFrom(primary: Colors.white), onPressed: ()async{ 
               var result;           
@@ -319,7 +321,7 @@ class RegisterPage extends State<RegisterPageSend>{
                 ),
               ),
             ),
-            ElevatedButton(onPressed: () async{
+            ElevatedButton.icon(icon: Icon(Icons.create_rounded), label: Text("signup".tr().toString()), onPressed: () async{
               email.text = email.text.trim();
               name.text = name.text.trim();
               password.text = password.text.trim();
@@ -341,7 +343,7 @@ class RegisterPage extends State<RegisterPageSend>{
               else{
                 ScaffoldMessenger.of(context).showSnackBar(new SnackBar(content: Text('alertFill'.tr().toString())));
               }
-            }, child: Text('signup'.tr().toString())),
+            }),
             SizedBox(height: 50,),
             ElevatedButton.icon(onPressed: ()async{ 
               Navigator.of(context).push(MaterialPageRoute(builder: (context) =>IntroductionPageSend()));
@@ -725,7 +727,7 @@ class AccountPage extends State<AccountPageSend>{
                     double xp = snapshot.data/xpPerLevel;
                     int level = xp.toInt() + 1;
                     xp -= xp.toInt(); 
-                    return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Colors.purple, minHeight: 50)), Padding(padding: const EdgeInsets.all(4.0), child: Center(child: Text('level'.tr().toString() + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
+                    return Stack(children: [ClipRRect(borderRadius: BorderRadius.all(Radius.circular(10)), child: LinearProgressIndicator(value: xp, color: Theme.of(context).appBarTheme.backgroundColor, minHeight: 50)), Padding(padding: const EdgeInsets.all(4.0), child: Center(child: Text('level'.tr().toString() + level.toString(), style: TextStyle(fontSize: 32, color: Colors.white),),),)]);
                   }
                   else
                     return LinearProgressIndicator(color: Colors.purple, minHeight: 50);
@@ -963,7 +965,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
               items: [15, 30, 45, 60, 120].map<DropdownMenuItem<int>>((int value) {
                 return DropdownMenuItem<int>(
                   value: value,
-                  child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
+                  child: Text(value.toString(), style:TextStyle(fontSize: 24),),
                 );
               }).toList(),
                 onChanged: (int? value) {
@@ -980,7 +982,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
                 items: [2, 3, 4, 5, 6, 7, 8, 9].map<DropdownMenuItem<int>>((int value) {
                   return DropdownMenuItem<int>(
                     value: value,
-                    child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
+                    child: Text(value.toString(), style:TextStyle(fontSize: 24),),
                   );
                 }).toList(),
                 onChanged: (int? value) {
@@ -998,7 +1000,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
               items: [1, 3, 5].map<DropdownMenuItem<int>>((int value) {
                 return DropdownMenuItem<int>(
                   value: value,
-                  child: Text(value.toString(), style:TextStyle(color:Colors.black, fontSize: 24),),
+                  child: Text(value.toString(), style:TextStyle(fontSize: 24),),
                 );
               }).toList(),
                 onChanged: (int? value) {
@@ -1015,7 +1017,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver{
               ),
             ),
             CheckboxListTile(
-              title: Text("increasingDifficulty".tr().toString(), style: TextStyle(fontSize: 24, color: increasingColor)),
+              title: Text("increasingDifficulty".tr().toString(), style: TextStyle(fontSize: 24)),
               value: options.increasingDiff,
               onChanged: (value) {
                 setState(() {
@@ -1577,7 +1579,7 @@ class GamePage extends State<GamePageSend> {
                             if(randomNumber.toString().length != entered.text.length)
                               btnApplyColor = Colors.grey;
                             else
-                              btnApplyColor = Theme.of(context).backgroundColor;
+                              btnApplyColor = Theme.of(context).appBarTheme.backgroundColor!;
                           });
                         },
                       ),
