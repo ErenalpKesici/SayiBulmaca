@@ -1,4 +1,4 @@
-package com.example.sayibulmaca
+package com.pobol.sayibulmaca
 
 import io.flutter.embedding.android.FlutterActivity
 
