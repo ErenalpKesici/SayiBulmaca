@@ -7,12 +7,57 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:33417723367:android:60575306c920898ec6d142",
+        "mobilesdk_app_id": "1:33417723367:android:d50a3c43713f38dcc6d142",
+        "android_client_info": {
+          "package_name": "com.example.sayibulmaca"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "33417723367-r3p6vd2ng3t24m1i5gmqpid2d10e8s7c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sayibulmaca",
+            "certificate_hash": "bebbb46d5510018e62bb7749857e0216f403e36a"
+          }
+        },
+        {
+          "client_id": "33417723367-cnda5tppeo2ss58ovvb2a3kmek88a57m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAilXS5AsZldPwaCH2hkMvzvXZ4VIj-CDM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "33417723367-cnda5tppeo2ss58ovvb2a3kmek88a57m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:33417723367:android:82051b8ebc907c22c6d142",
         "android_client_info": {
           "package_name": "com.pobol.sayibulmaca"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "33417723367-f96gv7budn92q7cpplsva8gk23jq7bh4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pobol.sayibulmaca",
+            "certificate_hash": "bebbb46d5510018e62bb7749857e0216f403e36a"
+          }
+        },
         {
           "client_id": "33417723367-cnda5tppeo2ss58ovvb2a3kmek88a57m.apps.googleusercontent.com",
           "client_type": 3

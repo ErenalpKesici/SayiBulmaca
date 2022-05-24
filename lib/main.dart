@@ -160,185 +160,192 @@ class InitialPage extends State<InitialPageSend> {
           leading: Container(),
           title: Text("title".tr().toString()),
           centerTitle: true),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 8.0),
-            child: Image.asset(
-              'assets/imgs/logo.png',
-              height: 100,
-              fit: BoxFit.contain,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Container(
-              child: TextField(
-                controller: email,
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10))),
+      body: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 8.0),
+              child: Image.asset(
+                'assets/imgs/logo.png',
+                height: 100,
+                fit: BoxFit.contain,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Container(
-              child: TextField(
-                controller: password,
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                    labelText: 'pass'.tr().toString(),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10))),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                child: TextField(
+                  controller: email,
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10))),
+                ),
               ),
             ),
-          ),
-          ElevatedButton.icon(
-              onPressed: () async {
-                if (email.text != "" && password.text != "") {
-                  FocusScope.of(context).unfocus();
-                  email.text = email.text.trim();
-                  password.text = password.text.trim();
-                  DocumentReference doc = FirebaseFirestore.instance
-                      .collection("Users")
-                      .doc(email.text);
-                  var document = await doc.get();
-                  if (!document.exists) {
-                    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                        content: Text('alertNotFound'.tr().toString())));
-                    return;
-                  }
-                  if (document.get('email') == email.text &&
-                      document.get('password') == password.text) {
-                    int result =
-                        await context.read<AuthenticationServices>().signIn(
-                              email: email.text,
-                              password: password.text,
-                            );
-                    if (result == 1) {
-                      Users user = new Users(
-                          email: document.get('email'),
-                          name: document.get('name'),
-                          password: document.get('password'),
-                          language: document.get('language'),
-                          xp: document.get('xp'),
-                          credit: document.get('credit'),
-                          method: document.get('method'),
-                          settings: document.get('settings'));
-                      toMainPage(context, user);
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                child: TextField(
+                  controller: password,
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                      labelText: 'pass'.tr().toString(),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10))),
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+                onPressed: () async {
+                  if (email.text != "" && password.text != "") {
+                    FocusScope.of(context).unfocus();
+                    email.text = email.text.trim();
+                    password.text = password.text.trim();
+                    DocumentReference doc = FirebaseFirestore.instance
+                        .collection("Users")
+                        .doc(email.text);
+                    var document = await doc.get();
+                    if (!document.exists) {
+                      ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
+                          content: Text('alertNotFound'.tr().toString())));
+                      return;
+                    }
+                    if (document.get('email') == email.text &&
+                        document.get('password') == password.text) {
+                      int result =
+                          await context.read<AuthenticationServices>().signIn(
+                                email: email.text,
+                                password: password.text,
+                              );
+                      if (result == 1) {
+                        Users user = new Users(
+                            email: document.get('email'),
+                            name: document.get('name'),
+                            password: document.get('password'),
+                            language: document.get('language'),
+                            xp: document.get('xp'),
+                            credit: document.get('credit'),
+                            method: document.get('method'),
+                            settings: document.get('settings'));
+                        toMainPage(context, user);
+                      } else
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(new SnackBar(content: Text('n')));
                     } else
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(new SnackBar(content: Text('n')));
-                  } else
-                    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                        content: Text('alertWrong'.tr().toString())));
-                }
-              },
-              label: Text('login'.tr().toString()),
-              icon: Icon(Icons.login)),
-          SizedBox(
-            height: 25,
-          ),
-          ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(primary: Colors.white),
-              onPressed: () async {
-                var result;
-                await googleSignIn.signIn().then((userData) {
-                  result = context.read<AuthenticationServices>().signIn(
-                        email: userData!.email,
-                        password: userData.id,
-                      );
-                  googleAccount = userData;
-                });
-                int read = await result;
-                if (read == 1) {
-                  DocumentReference doc = FirebaseFirestore.instance
-                      .collection("Users")
-                      .doc(googleAccount!.email);
-                  var document = await doc.get();
-                  if (!document.exists) return;
-                  Users user = new Users(
-                      email: document.get('email'),
-                      password: document.get('password'),
-                      name: document.get('name'),
-                      language: document.get('language'),
-                      xp: document.get('xp'),
-                      credit: document.get('credit'),
-                      method: document.get('method'),
-                      settings: document.get('settings'));
-                  toMainPage(context, user);
-                } else if (read == 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
+                          content: Text('alertWrong'.tr().toString())));
+                  }
+                },
+                label: Text('login'.tr().toString()),
+                icon: Icon(Icons.login)),
+            SizedBox(
+              height: 25,
+            ),
+            ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(primary: Colors.white),
+                onPressed: () async {
+                  var result;
                   await googleSignIn.signIn().then((userData) {
-                    result = context.read<AuthenticationServices>().signUp(
-                          email: userData?.email,
-                          password: userData?.id,
+                    result = context.read<AuthenticationServices>().signIn(
+                          email: userData!.email,
+                          password: userData.id,
                         );
                     googleAccount = userData;
                   });
-                  FirebaseFirestore.instance
-                      .collection('Users')
-                      .doc(googleAccount!.email)
-                      .set({
-                    'email': googleAccount!.email,
-                    'name': googleAccount!.displayName,
-                    'password': googleAccount!.id,
-                    'credit': 0,
-                    'status': 0,
-                    'xp': 0,
-                    'language': systemLanguage,
-                    'method': 'google',
-                    'settings': initialSettings
-                  });
-                  Users user = new Users(
-                      email: googleAccount!.email,
-                      password: googleAccount!.id,
-                      name: googleAccount!.displayName,
-                      language: systemLanguage,
-                      xp: 0,
-                      credit: 0,
-                      method: 'google',
-                      settings: initialSettings);
-                  toMainPage(context, user);
-                  ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                      content: Text('welcome'.tr().toString() +
-                          googleAccount!.displayName!)));
-                }
-              },
-              icon: Image.asset(
-                "assets/imgs/google.png",
-                width: 16,
-              ),
-              label: Text("loginGoogle".tr().toString(),
-                  style: TextStyle(color: Colors.black))),
-          SizedBox(
-            height: 50,
-          ),
-          ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => RegisterPageSend()));
-              },
-              icon: Icon(Icons.create_sharp),
-              label: Text(
-                "noaccount".tr().toString(),
-              )),
-          SizedBox(
-            height: 25,
-          ),
-          ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => IntroductionPageSend()));
-              },
-              icon: Icon(Icons.info_rounded),
-              label: Text(
-                "help".tr().toString(),
-              )),
-        ],
+                  int read = await result;
+                  if (read == 1) {
+                    DocumentReference doc = FirebaseFirestore.instance
+                        .collection("Users")
+                        .doc(googleAccount!.email);
+                    var document = await doc.get();
+                    if (!document.exists) return;
+                    Users user = new Users(
+                        email: document.get('email'),
+                        password: document.get('password'),
+                        name: document.get('name'),
+                        language: document.get('language'),
+                        xp: document.get('xp'),
+                        credit: document.get('credit'),
+                        method: document.get('method'),
+                        settings: document.get('settings'));
+                    toMainPage(context, user);
+                  } else if (read == 0) {
+                    await googleSignIn.signIn().then((userData) {
+                      result = context.read<AuthenticationServices>().signUp(
+                            email: userData?.email,
+                            password: userData?.id,
+                          );
+                      googleAccount = userData;
+                    });
+                    print(googleAccount.toString());
+                    print(FirebaseFirestore.instance.toString());
+                    print(initialSettings.toString());
+                    print(systemLanguage);
+                    await FirebaseFirestore.instance
+                        .collection('Users')
+                        .doc(googleAccount!.email)
+                        .set({
+                      'email': googleAccount!.email,
+                      'name': googleAccount!.displayName,
+                      'password': googleAccount!.id,
+                      'credit': 0,
+                      'status': 0,
+                      'xp': 0,
+                      'language': systemLanguage,
+                      'method': 'google',
+                      'settings': initialSettings
+                    });
+                    print("DONE");
+                    Users user = new Users(
+                        email: googleAccount!.email,
+                        password: googleAccount!.id,
+                        name: googleAccount!.displayName,
+                        language: systemLanguage,
+                        xp: 0,
+                        credit: 0,
+                        method: 'google',
+                        settings: initialSettings);
+                    toMainPage(context, user);
+                    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
+                        content: Text('welcome'.tr().toString() +
+                            googleAccount!.displayName!)));
+                  }
+                },
+                icon: Image.asset(
+                  "assets/imgs/google.png",
+                  width: 16,
+                ),
+                label: Text("loginGoogle".tr().toString(),
+                    style: TextStyle(color: Colors.black))),
+            SizedBox(
+              height: 50,
+            ),
+            ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => RegisterPageSend()));
+                },
+                icon: Icon(Icons.create_sharp),
+                label: Text(
+                  "noaccount".tr().toString(),
+                )),
+            SizedBox(
+              height: 25,
+            ),
+            ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => IntroductionPageSend()));
+                },
+                icon: Icon(Icons.info_rounded),
+                label: Text(
+                  "help".tr().toString(),
+                )),
+          ],
+        ),
       ),
     );
   }

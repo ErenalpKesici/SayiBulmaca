@@ -29,12 +29,12 @@ dependencies:
     sdk: flutter
   flutter_localizations: # Add this line
     sdk: flutter      
-  cloud_firestore: ^2.4.0
+  cloud_firestore: ^3.1.16
   firebase_core: ^1.4.0
   firebase_auth: ^3.0.1
   provider: ^5.0.0
   easy_localization: ^3.0.0
-  audioplayers: ^0.19.1
+  audioplayers: ^0.20.1
   google_sign_in: ^5.0.7
   flutter_launcher_icons: ^0.9.1
   connectivity_plus: ^1.0.6
