@@ -165,7 +165,7 @@ class InitialPage extends State<InitialPageSend> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(0, 0, 0, 8.0),
+              padding: const EdgeInsets.all(16),
               child: Image.asset(
                 'assets/imgs/logo.png',
                 height: 100,
@@ -242,7 +242,7 @@ class InitialPage extends State<InitialPageSend> {
                 label: Text('login'.tr().toString()),
                 icon: Icon(Icons.login)),
             SizedBox(
-              height: 25,
+              height: MediaQuery.of(context).size.height * .05,
             ),
             ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(primary: Colors.white),
@@ -1792,21 +1792,30 @@ class GamePage extends State<GamePageSend> {
   }
 
   Widget displayResult(List<Map<String, dynamic>> userScore) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor:
-            MaterialStateColor.resolveWith((states) => Colors.black12),
-        columns: [
-          DataColumn(label: Text('name'.tr().toString())),
-          DataColumn(label: Text('score'.tr().toString())),
-        ],
-        rows: userScore
-            .map<DataRow>((e) => DataRow(cells: [
-                  DataCell(Text(e['user'].toString())),
-                  DataCell(Text(e['score'].toString())),
-                ]))
-            .toList(),
+    return Center(
+      heightFactor: 1,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor:
+              MaterialStateColor.resolveWith((states) => Colors.black12),
+          columns: [
+            DataColumn(
+                label: Text(
+              'name'.tr().toString(),
+              textAlign: TextAlign.center,
+            )),
+            DataColumn(
+                label:
+                    Text('score'.tr().toString(), textAlign: TextAlign.center)),
+          ],
+          rows: userScore
+              .map<DataRow>((e) => DataRow(cells: [
+                    DataCell(Text(e['user'].toString())),
+                    DataCell(Text(e['score'].toString())),
+                  ]))
+              .toList(),
+        ),
       ),
     );
   }
