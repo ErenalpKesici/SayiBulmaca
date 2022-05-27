@@ -204,23 +204,46 @@ class InitialPage extends State<InitialPageSend> {
                     FocusScope.of(context).unfocus();
                     email.text = email.text.trim();
                     password.text = password.text.trim();
-                    DocumentReference doc = FirebaseFirestore.instance
-                        .collection("Users")
-                        .doc(email.text);
-                    var document = await doc.get();
-                    if (!document.exists) {
-                      ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                          content: Text('alertNotFound'.tr().toString())));
-                      return;
-                    }
-                    if (document.get('email') == email.text &&
-                        document.get('password') == password.text) {
-                      int result =
-                          await context.read<AuthenticationServices>().signIn(
-                                email: email.text,
-                                password: password.text,
-                              );
-                      if (result == 1) {
+                    int result =
+                        await context.read<AuthenticationServices>().signIn(
+                              email: email.text,
+                              password: password.text,
+                            );
+                    print(result);
+                    if (result == 1) {
+                      DocumentReference doc = FirebaseFirestore.instance
+                          .collection("Users")
+                          .doc(email.text);
+                      var document = await doc.get();
+                      if (!document.exists) {
+                        await FirebaseFirestore.instance
+                            .collection('Users')
+                            .doc(googleAccount!.email)
+                            .set({
+                          'email': googleAccount!.email,
+                          'name': googleAccount!.displayName,
+                          'password': googleAccount!.id,
+                          'credit': 0,
+                          'status': 0,
+                          'xp': 0,
+                          'language': systemLanguage,
+                          'method': 'google',
+                          'settings': initialSettings
+                        });
+                        Users user = new Users(
+                            email: googleAccount!.email,
+                            password: googleAccount!.id,
+                            name: googleAccount!.displayName,
+                            language: systemLanguage,
+                            xp: 0,
+                            credit: 0,
+                            method: 'google',
+                            settings: initialSettings);
+                        toMainPage(context, user);
+                        return;
+                      }
+                      if (document.get('email') == email.text &&
+                          document.get('password') == password.text) {
                         Users user = new Users(
                             email: document.get('email'),
                             name: document.get('name'),
@@ -232,12 +255,14 @@ class InitialPage extends State<InitialPageSend> {
                             settings: document.get('settings'));
                         toMainPage(context, user);
                       } else
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(new SnackBar(content: Text('n')));
+                        ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
+                            content: Text('alertWrong'.tr().toString())));
                     } else
                       ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                          content: Text('alertWrong'.tr().toString())));
-                  }
+                          content: Text('alertNotFound'.tr().toString())));
+                  } else
+                    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
+                        content: Text('alertFill'.tr().toString())));
                 },
                 label: Text('login'.tr().toString()),
                 icon: Icon(Icons.login)),
@@ -248,14 +273,16 @@ class InitialPage extends State<InitialPageSend> {
                 style: ElevatedButton.styleFrom(primary: Colors.white),
                 onPressed: () async {
                   var result;
-                  await googleSignIn.signIn().then((userData) {
-                    result = context.read<AuthenticationServices>().signIn(
-                          email: userData!.email,
-                          password: userData.id,
-                        );
+                  await googleSignIn.signIn().then((userData) async {
+                    result =
+                        await context.read<AuthenticationServices>().signIn(
+                              email: userData!.email,
+                              password: userData.id,
+                            );
                     googleAccount = userData;
                   });
                   int read = await result;
+                  print(read);
                   if (read == 1) {
                     DocumentReference doc = FirebaseFirestore.instance
                         .collection("Users")
@@ -273,17 +300,14 @@ class InitialPage extends State<InitialPageSend> {
                         settings: document.get('settings'));
                     toMainPage(context, user);
                   } else if (read == 0) {
-                    await googleSignIn.signIn().then((userData) {
-                      result = context.read<AuthenticationServices>().signUp(
-                            email: userData?.email,
-                            password: userData?.id,
-                          );
+                    await googleSignIn.signIn().then((userData) async {
+                      result =
+                          await context.read<AuthenticationServices>().signUp(
+                                email: userData?.email,
+                                password: userData?.id,
+                              );
                       googleAccount = userData;
                     });
-                    print(googleAccount.toString());
-                    print(FirebaseFirestore.instance.toString());
-                    print(initialSettings.toString());
-                    print(systemLanguage);
                     await FirebaseFirestore.instance
                         .collection('Users')
                         .doc(googleAccount!.email)
@@ -298,7 +322,6 @@ class InitialPage extends State<InitialPageSend> {
                       'method': 'google',
                       'settings': initialSettings
                     });
-                    print("DONE");
                     Users user = new Users(
                         email: googleAccount!.email,
                         password: googleAccount!.id,
@@ -309,9 +332,6 @@ class InitialPage extends State<InitialPageSend> {
                         method: 'google',
                         settings: initialSettings);
                     toMainPage(context, user);
-                    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                        content: Text('welcome'.tr().toString() +
-                            googleAccount!.displayName!)));
                   }
                 },
                 icon: Image.asset(
