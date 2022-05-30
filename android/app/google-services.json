@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "33417723367-uvdv91789v2490383ug0e35k2tmuc3tu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pobol.sayibulmaca",
+            "certificate_hash": "8a6c44be47188939a6579cc8c1063721adc48e07"
+          }
+        },
+        {
           "client_id": "33417723367-cnda5tppeo2ss58ovvb2a3kmek88a57m.apps.googleusercontent.com",
           "client_type": 3
         }

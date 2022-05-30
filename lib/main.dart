@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
@@ -19,6 +20,12 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_signin_button/flutter_signin_button.dart';
+
+import 'explore.dart';
 
 int randomNumber = 0, xpPerLevel = 100, selectedBottomIdx = 0;
 Timer? timerSeconds, timerPlayers;
@@ -26,6 +33,7 @@ String initialSettings = 'sound:false, ';
 Configuration? configuration;
 GetStorage introShown = GetStorage();
 String systemLanguage = Platform.localeName.split('_')[0];
+SharedPreferences? prefs;
 Future<Users> findUser(email) async {
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Users").doc(email);
@@ -53,6 +61,7 @@ void main() async {
   await Firebase.initializeApp();
   await EasyLocalization.ensureInitialized();
   await GetStorage.init();
+  prefs = await SharedPreferences.getInstance();
   introShown.writeIfNull('displayed', false);
   runApp(EasyLocalization(supportedLocales: [
     Locale('tr'),
@@ -142,6 +151,78 @@ class InitialPage extends State<InitialPageSend> {
   TextEditingController password = new TextEditingController();
   GoogleSignInAccount? googleAccount;
   GoogleSignIn googleSignIn = GoogleSignIn();
+  Map<String, dynamic>? _fbUserData;
+  AccessToken? _accessToken;
+
+  Future<void> _fbLogin() async {
+    final LoginResult result = await FacebookAuth.instance.login();
+    if (result.status == LoginStatus.success) {
+      _accessToken = result.accessToken;
+      final userData = await FacebookAuth.instance.getUserData();
+      print(userData);
+      final authResult = await context.read<AuthenticationServices>().signIn(
+            email: userData['email'],
+            password: userData['id'],
+          );
+      print(authResult);
+      Users user;
+      if (authResult == 0) {
+        await context.read<AuthenticationServices>().signUp(
+              email: userData['email'],
+              password: userData['id'],
+            );
+        await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(userData['email'])
+            .set({
+          'email': userData['email'],
+          'name': userData['name'],
+          'password': userData['id'],
+          'credit': 0,
+          'status': 0,
+          'xp': 0,
+          'language': systemLanguage,
+          'method': 'facebook',
+          'settings': initialSettings
+        });
+        user = new Users(
+            email: userData['email'],
+            password: userData['id'],
+            name: userData['name'],
+            language: systemLanguage,
+            xp: 0,
+            credit: 0,
+            method: 'facebook',
+            settings: initialSettings);
+      } else {
+        var document = await await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(userData['email'])
+            .get();
+        user = new Users(
+            email: document.get('email'),
+            name: document.get('name'),
+            password: document.get('password'),
+            language: document.get('language'),
+            xp: document.get('xp'),
+            credit: document.get('credit'),
+            method: document.get('method'),
+            settings: document.get('settings'));
+      }
+      toMainPage(context, user);
+    } else {
+      print(result.status);
+      print(result.message);
+    }
+  }
+
+  Future<void> _fbLogOut() async {
+    await FacebookAuth.instance.logOut();
+    _accessToken = null;
+    _fbUserData = null;
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -269,79 +350,77 @@ class InitialPage extends State<InitialPageSend> {
             SizedBox(
               height: MediaQuery.of(context).size.height * .05,
             ),
-            ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(primary: Colors.white),
+            SignInButton(Buttons.Google, text: 'loginGoogle.'.tr(),
                 onPressed: () async {
-                  var result;
-                  await googleSignIn.signIn().then((userData) async {
-                    result =
-                        await context.read<AuthenticationServices>().signIn(
-                              email: userData!.email,
-                              password: userData.id,
-                            );
-                    googleAccount = userData;
-                  });
-                  int read = await result;
-                  print(read);
-                  if (read == 1) {
-                    DocumentReference doc = FirebaseFirestore.instance
-                        .collection("Users")
-                        .doc(googleAccount!.email);
-                    var document = await doc.get();
-                    if (!document.exists) return;
-                    Users user = new Users(
-                        email: document.get('email'),
-                        password: document.get('password'),
-                        name: document.get('name'),
-                        language: document.get('language'),
-                        xp: document.get('xp'),
-                        credit: document.get('credit'),
-                        method: document.get('method'),
-                        settings: document.get('settings'));
-                    toMainPage(context, user);
-                  } else if (read == 0) {
-                    await googleSignIn.signIn().then((userData) async {
-                      result =
-                          await context.read<AuthenticationServices>().signUp(
-                                email: userData?.email,
-                                password: userData?.id,
-                              );
-                      googleAccount = userData;
-                    });
-                    await FirebaseFirestore.instance
-                        .collection('Users')
-                        .doc(googleAccount!.email)
-                        .set({
-                      'email': googleAccount!.email,
-                      'name': googleAccount!.displayName,
-                      'password': googleAccount!.id,
-                      'credit': 0,
-                      'status': 0,
-                      'xp': 0,
-                      'language': systemLanguage,
-                      'method': 'google',
-                      'settings': initialSettings
-                    });
-                    Users user = new Users(
-                        email: googleAccount!.email,
-                        password: googleAccount!.id,
-                        name: googleAccount!.displayName,
-                        language: systemLanguage,
-                        xp: 0,
-                        credit: 0,
-                        method: 'google',
-                        settings: initialSettings);
-                    toMainPage(context, user);
-                  }
-                },
-                icon: Image.asset(
-                  "assets/imgs/google.png",
-                  width: 16,
-                ),
-                label: Text("loginGoogle".tr().toString(),
-                    style: TextStyle(color: Colors.black))),
+              var result;
+              await googleSignIn.signIn().then((userData) async {
+                result = await context.read<AuthenticationServices>().signIn(
+                      email: userData!.email,
+                      password: userData.id,
+                    );
+                googleAccount = userData;
+              });
+              int read = await result;
+              print(read);
+              if (read == 1) {
+                DocumentReference doc = FirebaseFirestore.instance
+                    .collection("Users")
+                    .doc(googleAccount!.email);
+                var document = await doc.get();
+                if (!document.exists) return;
+                Users user = new Users(
+                    email: document.get('email'),
+                    password: document.get('password'),
+                    name: document.get('name'),
+                    language: document.get('language'),
+                    xp: document.get('xp'),
+                    credit: document.get('credit'),
+                    method: document.get('method'),
+                    settings: document.get('settings'));
+                toMainPage(context, user);
+              } else if (read == 0) {
+                await googleSignIn.signIn().then((userData) async {
+                  result = await context.read<AuthenticationServices>().signUp(
+                        email: userData?.email,
+                        password: userData?.id,
+                      );
+                  googleAccount = userData;
+                });
+                await FirebaseFirestore.instance
+                    .collection('Users')
+                    .doc(googleAccount!.email)
+                    .set({
+                  'email': googleAccount!.email,
+                  'name': googleAccount!.displayName,
+                  'password': googleAccount!.id,
+                  'credit': 0,
+                  'status': 0,
+                  'xp': 0,
+                  'language': systemLanguage,
+                  'method': 'google',
+                  'settings': initialSettings
+                });
+                Users user = new Users(
+                    email: googleAccount!.email,
+                    password: googleAccount!.id,
+                    name: googleAccount!.displayName,
+                    language: systemLanguage,
+                    xp: 0,
+                    credit: 0,
+                    method: 'google',
+                    settings: initialSettings);
+                toMainPage(context, user);
+              }
+            }),
+            SignInButton(
+              Buttons.Facebook,
+              text: "loginFacebook".tr(),
+              onPressed: () async {
+                await _fbLogin();
+              },
+            ),
             SizedBox(
-              height: 50,
+              height: 20,
             ),
             ElevatedButton.icon(
                 onPressed: () async {
@@ -382,6 +461,10 @@ List<BottomNavigationBarItem> bottomNavItems() {
       label: 'createBtn'.tr().toString(),
     ),
     BottomNavigationBarItem(
+      icon: Icon(Icons.explore),
+      label: 'explore'.tr().toString(),
+    ),
+    BottomNavigationBarItem(
       icon: Icon(Icons.account_box_rounded),
       label: 'account'.tr().toString(),
     ),
@@ -404,9 +487,13 @@ void navigateBottom(BuildContext context, Users user) {
       break;
     case 2:
       Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => AccountPageSend(user: user)));
+          MaterialPageRoute(builder: (context) => ExplorePageSend(user: user)));
       break;
     case 3:
+      Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => AccountPageSend(user: user)));
+      break;
+    case 4:
       Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => SettingsPageSend(user: user)));
       break;
@@ -1125,6 +1212,12 @@ class AccountPage extends State<AccountPageSend> {
                                         onPressed: () async {
                                           await context
                                               .read<AuthenticationServices>()
+                                              .signIn(
+                                                  email: this.user!.email,
+                                                  password:
+                                                      this.user!.password);
+                                          await context
+                                              .read<AuthenticationServices>()
                                               .delete(
                                                   email: this.user!.email,
                                                   password:
@@ -1319,7 +1412,21 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   @override
   void initState() {
     WidgetsBinding.instance.addObserver(this);
-
+    options.multiplayer = (prefs?.getBool('multiplayer') == null
+        ? options.multiplayer
+        : prefs?.getBool('multiplayer')!)!;
+    options.duration = (prefs?.getInt('duration') == null
+        ? options.duration
+        : prefs?.getInt('duration')!)!;
+    options.length = (prefs?.getInt('length') == null
+        ? options.length
+        : prefs?.getInt('length')!)!;
+    options.bestOf = (prefs?.getInt('bestOf') == null
+        ? options.bestOf
+        : prefs?.getInt('bestOf')!)!;
+    options.increasingDiff = (prefs?.getBool('increasingDiff') == null
+        ? options.increasingDiff
+        : prefs?.getBool('increasingDiff')!)!;
     super.initState();
   }
 
@@ -1333,15 +1440,22 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.paused) {
-      DocumentReference doc =
-          FirebaseFirestore.instance.collection("Rooms").doc(this.user?.email);
-      var document = await doc.get();
-      if (document.exists && document.get('status') == 'ready') {
-        FirebaseFirestore.instance
-            .collection('Rooms')
-            .doc(this.user!.email)
-            .delete();
-        toMainPage(context, user!);
+      final authResult = await context.read<AuthenticationServices>().signIn(
+            email: this.user?.email,
+            password: this.user?.password,
+          );
+      if (authResult == 1) {
+        DocumentReference doc = FirebaseFirestore.instance
+            .collection("Rooms")
+            .doc(this.user?.email);
+        var document = await doc.get();
+        if (document.exists && document.get('status') == 'ready') {
+          FirebaseFirestore.instance
+              .collection('Rooms')
+              .doc(this.user!.email)
+              .delete();
+          toMainPage(context, user!);
+        }
       }
     }
     print(state);
@@ -1522,7 +1636,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
               controlAffinity: ListTileControlAffinity.trailing,
             ),
             ElevatedButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   if (options.multiplayer) {
                     FirebaseFirestore.instance
                         .collection('Rooms')
@@ -1645,6 +1759,11 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                         builder: (context) => GamePageSend(
                             user, this.user?.email, this.options)));
                   }
+                  prefs?.setBool('multiplayer', options.multiplayer);
+                  prefs?.setInt('duration', options.duration);
+                  prefs?.setInt('length', options.length);
+                  prefs?.setInt('bestOf', options.bestOf);
+                  prefs?.setBool('increasingDiff', options.increasingDiff);
                 },
                 style: ElevatedButton.styleFrom(padding: EdgeInsets.all(32)),
                 icon: Icon(Icons.play_circle),
@@ -1875,22 +1994,12 @@ class GamePage extends State<GamePageSend> {
                     });
                 });
               return AlertDialog(
-                title: Center(child: Text("endRound".tr().toString())),
-                content: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Center(
-                      child: displayNumber(),
-                    ),
-                    SizedBox(
-                      height: 100,
-                    ),
-                    Center(
-                      child: Text('nextRound'.tr().toString() + cd.toString(),
-                          textAlign: TextAlign.center),
-                    ),
-                  ],
+                title: Center(
+                  child: displayNumber(),
                 ),
+                content: Text(
+                    'nextRound'.tr().toString() + ': ' + cd.toString(),
+                    textAlign: TextAlign.center),
                 actions: <Widget>[
                   ElevatedButton(
                       onPressed: () {
@@ -1940,7 +2049,7 @@ class GamePage extends State<GamePageSend> {
               contentPadding: EdgeInsets.zero,
               title: Padding(
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 25),
-                child: Center(child: Text("results".tr().toString())),
+                child: Center(child: displayNumber()),
               ),
               content: displayResult(userScore),
               actions: <Widget>[

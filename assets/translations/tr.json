@@ -3,6 +3,7 @@
     "login": "Giriş Yap",
     "loginEmail": "Email ile Giriş Yap",
     "loginGoogle": "Google ile Devam et",
+    "loginFacebook": "Facebook ile Devam et",
     "signup": "Kayıt Ol",
     "signupEmail": "Email ile Kayıt Ol",
     "id": "Kullanıcı Adı",
@@ -39,6 +40,7 @@
     "delete": "Hesabı Sil",
     "logout": "Hesaptan Çıkış Yap",
     "start": "Oyunu Başlat",
+    "explore": "Keşfet",    
     "account": "Hesap",    
     "credit": "Kredi",
     "settings": "Ayarlar",
@@ -79,5 +81,8 @@
     "next": "İleri",
     "skip": "Atla",
     "done": "Son",
-    "welcome": "Hoş Geldiniz "
+    "welcome": "Hoş Geldiniz ",
+    "searchUser": "Email veya Ad kullanarak kullanıcı arama",
+    "sendFriend": "Arkadaş isteği gönder",
+    "unsendFriend": "Arkadaş isteğini geri al"
 }

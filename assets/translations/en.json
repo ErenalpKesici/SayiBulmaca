@@ -3,6 +3,7 @@
     "login": "Sign In",
     "loginEmail": "Sign In with Email",
     "loginGoogle": "Continue with Google",
+    "loginFacebook": "Continue with Facebook",
     "signup": "Sign up",
     "signupEmail": "Sign up with Email",
     "id": "Username",
@@ -37,6 +38,7 @@
     "delete": "Delete Account",
     "logout": "Sign out of the Account",
     "account": "Account",
+    "explore": "Explore",    
     "credit": "Credit",
     "settings": "Settings",
     "soundEffects": "Sound Effects",
@@ -78,5 +80,8 @@
     "next": "Next",
     "skip": "Skip",
     "done": "Done",
-    "welcome": "Welcome "
+    "welcome": "Welcome ",
+    "searchUser": "Search users by email or name",
+    "sendFriend": "Send a friend request",
+    "unsendFriend": "Unsend the friend request"
 }
