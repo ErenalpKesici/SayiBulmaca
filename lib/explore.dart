@@ -24,7 +24,7 @@ class ExplorePage extends State<ExplorePageSend> {
   TextEditingController query = TextEditingController(text: '');
   List<Users> foundUsers = List.empty(growable: true);
   List<String> alreadyRequested = List.empty(growable: true);
-  List<String> myRequests = List.empty(growable: true);
+  List myRequests = List.empty(growable: true);
 
   Future<int> getXp() async {
     DocumentReference docUser =
@@ -41,7 +41,7 @@ class ExplorePage extends State<ExplorePageSend> {
       setState(() {
         myRequests = doc.get('requests');
       });
-    } catch (e) {}
+    } catch (e) {print(e);}
   }
 
   @override
@@ -77,16 +77,22 @@ class ExplorePage extends State<ExplorePageSend> {
             Badge(
               position: BadgePosition.topStart(),
               badgeColor: Theme.of(context).selectedRowColor,
-              badgeContent: Text(''),
+              badgeContent: Text(myRequests.length.toString()),
               child: PopupMenuButton(
                 icon: Icon(Icons.account_box),
                 itemBuilder: (BuildContext context) {
-                  return [PopupMenuItem(child: Text('ads'))];
+                    List<PopupMenuEntry> requests = List.empty(growable: true);
+                    requests.add(PopupMenuItem(enabled: false, child: Center(child: Text('friendRequests'.tr())),));
+                    myRequests.forEach((element) {requests.add(PopupMenuItem(child: ListTile(leading: Text(element.split('@').first), trailing: SizedBox(width: MediaQuery.of(context).size.width*.3, child: Row(children: [IconButton(icon: Icon(Icons.check_circle, color: Colors.green,), onPressed: () {  },), IconButton(icon: Icon(Icons.block, color: Colors.red,), onPressed: () async{
+    DocumentReference docRef =
+        FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+    var doc = await docRef.get(); List reqs = doc.get('requests'); reqs.removeWhere((inElement) => element == inElement); FirebaseFirestore.instance.collection("Users").doc(user!.email!).update({'requests': reqs});},)  ],)),),)); loadRequests();});
+                  return requests;
                 },
               ),
             )
           ],
-        ),
+        ), 
         body: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Column(
