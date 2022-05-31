@@ -59,7 +59,7 @@
     "helpScreenTitle3": "How to Play the Game",
     "helpScreenInfo3": "The objective of the game is to guess the randomally generated number within a time limit.\nAfter a guess is entered, whichever digits are right in the right place (+) and whichever are right but in the wrong place (-) are shown in the table below.\nIf you guess it right you win the game.\nYou'll get scored according to time taken, number of guesses and the difficulty (number length).\nIf stuck, a not-found digit can be revealed by spending 100 credits from the button on top-right.",
     "helpScreenImg3": "assets/imgs/help/enHelp3.png",
-    "time": "Time ",
+    "time": "Duration ",
     "digit": "Digit",
     "digitLength": "Digit Length",
     "bestOf": "Round",
@@ -83,5 +83,9 @@
     "welcome": "Welcome ",
     "searchUser": "Search users by email or name",
     "sendFriend": "Send a friend request",
-    "unsendFriend": "Unsend the friend request"
+    "unsendFriend": "Unsend the friend request",
+    "friendRequests": "Friend Requests",
+    "friends": "Friends",
+    "unfriend": "Remove from friends",
+    "invite": "Invite"
 }

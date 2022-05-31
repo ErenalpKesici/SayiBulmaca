@@ -34,6 +34,7 @@ Configuration? configuration;
 GetStorage introShown = GetStorage();
 String systemLanguage = Platform.localeName.split('_')[0];
 SharedPreferences? prefs;
+bool inviteScanning = true, currentlyScanning = false;
 Future<Users> findUser(email) async {
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Users").doc(email);
@@ -115,9 +116,9 @@ class AuthenticationWrapper extends StatelessWidget {
       return FutureBuilder(
         future: findUser(firebaseUser.email),
         builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-          if (snapshot.hasData)
+          if (snapshot.hasData) {
             return SearchPageSend(user: snapshot.data);
-          else
+          } else
             return Center(child: CircularProgressIndicator());
         },
       );
@@ -461,7 +462,7 @@ List<BottomNavigationBarItem> bottomNavItems() {
       label: 'createBtn'.tr().toString(),
     ),
     BottomNavigationBarItem(
-      icon: Icon(Icons.explore),
+      icon: Icon(Icons.people_alt),
       label: 'explore'.tr().toString(),
     ),
     BottomNavigationBarItem(
@@ -646,9 +647,9 @@ class RegisterPage extends State<RegisterPageSend> {
   }
 }
 
-void joinDialog(BuildContext context, String foundRoom, String currentPlayers,
+void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
     Users user) async {
-  List<String> playersFound = new List.empty(growable: true);
+  List playersFound = new List.empty(growable: true);
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Rooms").doc(foundRoom);
   Timer.periodic(new Duration(seconds: 1), (timer) async {
@@ -674,10 +675,11 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers,
       timerPlayers?.cancel();
     }
   });
+  currentPlayers.add(user.name!);
   FirebaseFirestore.instance
       .collection('Rooms')
       .doc(foundRoom)
-      .update({'players': currentPlayers + user.name! + ', '});
+      .update({'players': currentPlayers});
   showDialog(
       context: context,
       barrierDismissible: false,
@@ -688,7 +690,7 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers,
             var document = await doc.get();
             if (document.exists && document.get('status') == 'ready')
               setState(() {
-                playersFound = document.get('players').split(', ');
+                playersFound = document.get('players');
               });
             else
               timer.cancel();
@@ -700,7 +702,7 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers,
               child: Column(
                 children: [
                   Text((playersFound.length != 0
-                          ? (playersFound.length - 2).toString()
+                          ? (playersFound.length - 1).toString()
                           : '0') +
                       'found'.tr().toString()),
                   SizedBox(
@@ -719,11 +721,11 @@ void joinDialog(BuildContext context, String foundRoom, String currentPlayers,
                         timerPlayers?.cancel();
                         var document = await doc.get();
                         if (document.exists) {
-                          List<String> pls = currentPlayers.split(', ');
-                          currentPlayers = '';
+                          List pls = currentPlayers;
+                          currentPlayers = List.empty(growable: true);
                           for (int i = 0; i < pls.length - 1; i++)
                             if (pls[i] != user.email)
-                              currentPlayers = currentPlayers + pls[i] + ', ';
+                              currentPlayers.add(pls[i]);
                           doc.update({'players': currentPlayers});
                         }
                         Navigator.pop(context);
@@ -759,6 +761,7 @@ Future<bool> logout(BuildContext context) async {
               onPressed: () async {
                 await context.read<AuthenticationServices>().signOut();
                 Navigator.pop(c, false);
+                inviteScanning = false;
                 Navigator.of(context).push(
                     MaterialPageRoute(builder: (context) => InitialPageSend()));
               },
@@ -788,6 +791,60 @@ class SearchPage extends State<SearchPageSend> {
   @override
   void initState() {
     checkNetwork(context);
+
+    if (currentlyScanning == false) {
+      currentlyScanning = true;
+      Timer.periodic(Duration(seconds: 1), (timer) async {
+        if (inviteScanning == false) {
+          currentlyScanning = false;
+          timer.cancel();
+        }
+        DocumentReference? docRef;
+        try {
+          docRef =
+              FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+        } catch (e) {
+          timer.cancel();
+        }
+        var doc = await docRef!.get();
+        try {
+          List invites = doc.get('invite');
+          if (invites.isNotEmpty) {
+            String invite = invites.removeLast();
+            FirebaseFirestore.instance
+                .collection("Users")
+                .doc(user!.email!)
+                .update({'invite': invites});
+            showDialog(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: Text('invite'.tr()),
+                    content: Text(invite),
+                    actions: [
+                      ElevatedButton.icon(
+                          onPressed: () async {
+                            DocumentReference ref = FirebaseFirestore.instance
+                                .collection('Rooms')
+                                .doc(invite);
+                            var doc = await ref.get();
+                            List players = doc.get('players');
+                            players.add(user!.name!);
+                            FirebaseFirestore.instance
+                                .collection('Rooms')
+                                .doc(invite)
+                                .update({'players': players});
+                            // Timer.periodic(Duration, (timer) { })
+                          },
+                          icon: Icon(Icons.check_circle),
+                          label: Text('join'.tr()))
+                    ],
+                  );
+                });
+          }
+        } catch (e) {}
+      });
+    }
     if (configuration == null)
       configuration = new Configuration(this.user!.settings!);
     super.initState();
@@ -936,7 +993,8 @@ class JoinGamePageSend extends StatefulWidget {
 }
 
 class Room {
-  String creator, currentPlayers;
+  String creator;
+  List currentPlayers;
   int? time, digit, bestOf;
   Room(
       {required this.creator,
@@ -1026,12 +1084,11 @@ class JoinGamePage extends State<JoinGamePageSend> {
                               },
                               cells: [
                                 DataCell(Text(
-                                  e.currentPlayers.split(', ')[0].toString(),
+                                  e.currentPlayers[0].toString(),
                                   textAlign: TextAlign.center,
                                 )),
                                 DataCell(Text(
-                                  (e.currentPlayers.split(', ').length - 1)
-                                      .toString(),
+                                  (e.currentPlayers.length - 1).toString(),
                                   textAlign: TextAlign.center,
                                 )),
                                 DataCell(Text(
@@ -1070,10 +1127,14 @@ class AccountPage extends State<AccountPageSend> {
   AccountPage(this.user);
 
   Future<int> getXp() async {
-    DocumentReference docUser =
-        FirebaseFirestore.instance.collection("Users").doc(this.user?.email);
-    var documentUser = await docUser.get();
-    return documentUser.get('xp');
+    try {
+      DocumentReference docUser =
+          FirebaseFirestore.instance.collection("Users").doc(this.user?.email);
+      var documentUser = await docUser.get();
+      return documentUser.get('xp');
+    } catch (e) {
+      return -1;
+    }
   }
 
   @override
@@ -1408,6 +1469,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   Users? user;
   Color btnStartColor = Colors.grey;
   Options options = new Options.empty();
+  List<String> invited = List.empty(growable: true);
   SetupPage(this.user);
   @override
   void initState() {
@@ -1459,6 +1521,22 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
       }
     }
     print(state);
+  }
+
+  void popInvites() async {
+    print(invited);
+    invited.forEach((element) async {
+      DocumentReference docRef =
+          FirebaseFirestore.instance.collection("Users").doc(element);
+      var doc = await docRef.get();
+      List ins = doc.get('invite');
+      ins.removeWhere((element) => element == user!.email!);
+      FirebaseFirestore.instance
+          .collection("Users")
+          .doc(element)
+          .update({'invite': ins});
+    });
+    invited = List.empty(growable: true);
   }
 
   @override
@@ -1642,7 +1720,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                         .collection('Rooms')
                         .doc(this.user!.email)
                         .set({
-                      'players': this.user!.name! + ', ',
+                      'players': List.filled(1, this.user!.name!),
                       'game': options.game,
                       'length': options.length,
                       'status': 'ready',
@@ -1655,23 +1733,20 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                     DocumentReference doc = FirebaseFirestore.instance
                         .collection("Rooms")
                         .doc(this.user?.email);
-                    List<String> playersFound = new List.empty(growable: true);
+                    List playersFound = new List.empty(growable: true);
                     showDialog(
                         context: context,
                         barrierDismissible: false,
                         builder: (BuildContext context) {
-                          return StatefulBuilder(builder: (context, setState) {
+                          return StatefulBuilder(
+                              builder: (context, setInnerState) {
                             timerPlayers = Timer.periodic(
                                 new Duration(seconds: 5), (timer) async {
                               var document = await doc.get();
                               if (document.exists &&
                                   document.get('status') == 'ready')
-                                setState(() {
-                                  playersFound =
-                                      document.get('players').split(', ');
-                                  btnStartColor = playersFound.length > 2
-                                      ? Theme.of(context).primaryColor
-                                      : Colors.grey;
+                                setInnerState(() {
+                                  playersFound = document.get('players');
                                 });
                               else
                                 timer.cancel();
@@ -1686,7 +1761,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                   children: [
                                     Text(
                                       (playersFound.length != 0
-                                              ? (playersFound.length - 2)
+                                              ? (playersFound.length - 1)
                                                   .toString()
                                               : '0') +
                                           'found'.tr().toString(),
@@ -1711,29 +1786,110 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                               .doc(this.user!.email)
                                               .delete();
                                           Navigator.pop(context);
+                                          popInvites();
                                         },
                                         child: Text('abort'.tr().toString())),
-                                    SizedBox(
-                                      width: 20,
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                                      child: ElevatedButton(
+                                          onPressed: () async {
+                                            DocumentReference docRef =
+                                                FirebaseFirestore.instance
+                                                    .collection("Users")
+                                                    .doc(user!.email!);
+                                            var doc = await docRef.get();
+                                            List friends =
+                                                List.empty(growable: true);
+                                            try {
+                                              friends = doc.get('friends');
+                                            } catch (e) {
+                                              return null;
+                                            }
+                                            showDialog(
+                                                context: context,
+                                                builder: (context) {
+                                                  return AlertDialog(
+                                                    title: Text('friends'.tr()),
+                                                    content: Container(
+                                                      width: 100,
+                                                      height: 100,
+                                                      child: StatefulBuilder(
+                                                        builder: (BuildContext
+                                                                context,
+                                                            void Function(
+                                                                    void
+                                                                        Function())
+                                                                setState) {
+                                                          return ListView
+                                                              .builder(
+                                                                  shrinkWrap:
+                                                                      true,
+                                                                  itemCount:
+                                                                      friends
+                                                                          .length,
+                                                                  itemBuilder:
+                                                                      (BuildContext
+                                                                              context,
+                                                                          int idx) {
+                                                                    print(
+                                                                        invited);
+                                                                    return invited
+                                                                            .contains(friends[idx])
+                                                                        ? Container()
+                                                                        : ListTile(
+                                                                            title:
+                                                                                Text(friends[idx].split('@').first),
+                                                                            trailing:
+                                                                                ElevatedButton.icon(
+                                                                              icon: Icon(Icons.send_outlined),
+                                                                              label: Text('invite'.tr()),
+                                                                              onPressed: () async {
+                                                                                List invites = List.empty(growable: true);
+                                                                                DocumentReference docRef = FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
+                                                                                var doc = await docRef.get();
+                                                                                try {
+                                                                                  invites = doc.get('invite');
+                                                                                } catch (e) {}
+                                                                                invites.add(user!.email!);
+                                                                                FirebaseFirestore.instance.collection("Users").doc(friends[idx]).update({
+                                                                                  'invite': invites
+                                                                                });
+                                                                                setState(() {
+                                                                                  invited.add(friends[idx]);
+                                                                                });
+                                                                              },
+                                                                            ),
+                                                                          );
+                                                                  });
+                                                        },
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                          },
+                                          child: Text('invite'.tr())),
                                     ),
                                     ElevatedButton(
-                                        onPressed: () {
-                                          if (btnStartColor == Colors.grey)
-                                            return;
-                                          FirebaseFirestore.instance
-                                              .collection('Rooms')
-                                              .doc(this.user?.email)
-                                              .update({'status': 'playing'});
-                                          Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      GamePageSend(
-                                                          user,
-                                                          this.user?.email,
-                                                          options)));
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                            primary: btnStartColor),
+                                        onPressed: playersFound.length > 1
+                                            ? () {
+                                                FirebaseFirestore.instance
+                                                    .collection('Rooms')
+                                                    .doc(this.user?.email)
+                                                    .update(
+                                                        {'status': 'playing'});
+                                                Navigator.of(context).push(
+                                                    MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            GamePageSend(
+                                                                user,
+                                                                this
+                                                                    .user
+                                                                    ?.email,
+                                                                options)));
+                                                popInvites();
+                                              }
+                                            : null,
                                         child: Text('start'.tr().toString()))
                                   ],
                                 )
@@ -1746,7 +1902,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                         .collection("Rooms")
                         .doc(this.user?.email)
                         .set({
-                      'players': this.user!.name! + ", ",
+                      'players': List.filled(1, this.user!.name!),
                       'game': options.game,
                       'length': options.length,
                       'status': 'playing',
@@ -1828,7 +1984,7 @@ class GamePage extends State<GamePageSend> {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
-    var players = document.get('players').split(', ');
+    var players = document.get('players');
     if (withWon) {
       for (int i = 0; i < players.length - 1; i++)
         ret.add(players[i] + ":" + "0");
@@ -1844,7 +2000,7 @@ class GamePage extends State<GamePageSend> {
         }
       }
     } else
-      for (int i = 0; i < players.length - 1; i++) ret.add(players[i]);
+      for (int i = 0; i < players.length; i++) ret.add(players[i]);
     return ret;
   }
 
@@ -1931,6 +2087,7 @@ class GamePage extends State<GamePageSend> {
   }
 
   Widget displayResult(List<Map<String, dynamic>> userScore) {
+    print(userScore);
     return Center(
       heightFactor: 1,
       child: SingleChildScrollView(
@@ -2027,6 +2184,7 @@ class GamePage extends State<GamePageSend> {
       for (int i = 0; i < players.length; i++) {
         userScore.add({'user': players[i], 'score': 0});
       }
+      print(userScore);
       for (int j = 0; j < userScoreTmp.length; j++)
         for (int k = 0; k < userScore.length; k++)
           if (userScoreTmp[j]['user'] == userScore[k]['user'])

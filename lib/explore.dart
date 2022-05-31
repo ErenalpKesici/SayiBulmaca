@@ -9,6 +9,9 @@ import 'Users.dart';
 import 'main.dart';
 import 'package:badges/badges.dart';
 
+List myRequests = List.empty(growable: true);
+List myFriends = List.empty(growable: true);
+
 class ExplorePageSend extends StatefulWidget {
   final Users? user;
   ExplorePageSend({@required this.user});
@@ -24,7 +27,6 @@ class ExplorePage extends State<ExplorePageSend> {
   TextEditingController query = TextEditingController(text: '');
   List<Users> foundUsers = List.empty(growable: true);
   List<String> alreadyRequested = List.empty(growable: true);
-  List myRequests = List.empty(growable: true);
 
   Future<int> getXp() async {
     DocumentReference docUser =
@@ -41,13 +43,59 @@ class ExplorePage extends State<ExplorePageSend> {
       setState(() {
         myRequests = doc.get('requests');
       });
-    } catch (e) {print(e);}
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  void loadFriends() async {
+    DocumentReference docRef =
+        FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+    var doc = await docRef.get();
+    try {
+      setState(() {
+        myFriends = doc.get('friends');
+      });
+    } catch (e) {
+      print(e);
+    }
   }
 
   @override
   void initState() {
     loadRequests();
+    loadFriends();
     super.initState();
+  }
+
+  void popRequest(String element) async {
+    DocumentReference docRef =
+        FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+    var doc = await docRef.get();
+    List reqs = doc.get('requests');
+    reqs.removeWhere((inElement) => element == inElement);
+    FirebaseFirestore.instance
+        .collection("Users")
+        .doc(user!.email!)
+        .update({'requests': reqs});
+    setState(() {
+      myRequests = reqs;
+    });
+  }
+
+  void popFriend(String element) async {
+    DocumentReference docRef =
+        FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+    var doc = await docRef.get();
+    List fs = doc.get('friends');
+    fs.removeWhere((inElement) => element == inElement);
+    FirebaseFirestore.instance
+        .collection("Users")
+        .doc(user!.email!)
+        .update({'friends': fs});
+    setState(() {
+      myFriends = fs;
+    });
   }
 
   @override
@@ -75,136 +123,235 @@ class ExplorePage extends State<ExplorePageSend> {
           centerTitle: true,
           actions: [
             Badge(
+              showBadge: myRequests.isNotEmpty,
               position: BadgePosition.topStart(),
               badgeColor: Theme.of(context).selectedRowColor,
               badgeContent: Text(myRequests.length.toString()),
               child: PopupMenuButton(
                 icon: Icon(Icons.account_box),
                 itemBuilder: (BuildContext context) {
-                    List<PopupMenuEntry> requests = List.empty(growable: true);
-                    requests.add(PopupMenuItem(enabled: false, child: Center(child: Text('friendRequests'.tr())),));
-                    myRequests.forEach((element) {requests.add(PopupMenuItem(child: ListTile(leading: Text(element.split('@').first), trailing: SizedBox(width: MediaQuery.of(context).size.width*.3, child: Row(children: [IconButton(icon: Icon(Icons.check_circle, color: Colors.green,), onPressed: () {  },), IconButton(icon: Icon(Icons.block, color: Colors.red,), onPressed: () async{
-    DocumentReference docRef =
-        FirebaseFirestore.instance.collection("Users").doc(user!.email!);
-    var doc = await docRef.get(); List reqs = doc.get('requests'); reqs.removeWhere((inElement) => element == inElement); FirebaseFirestore.instance.collection("Users").doc(user!.email!).update({'requests': reqs});},)  ],)),),)); loadRequests();});
+                  List<PopupMenuEntry> requests = List.empty(growable: true);
+                  requests.add(PopupMenuItem(
+                    enabled: false,
+                    child: Center(child: Text('friendRequests'.tr())),
+                  ));
+                  myRequests.forEach((element) {
+                    requests.add(PopupMenuItem(
+                      child: ListTile(
+                        leading: Text(element.split('@').first),
+                        trailing: SizedBox(
+                            width: MediaQuery.of(context).size.width * .3,
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  ),
+                                  onPressed: () async {
+                                    DocumentReference docRef = FirebaseFirestore
+                                        .instance
+                                        .collection("Users")
+                                        .doc(user!.email!);
+                                    DocumentReference fDocRef =
+                                        FirebaseFirestore.instance
+                                            .collection("Users")
+                                            .doc(element);
+                                    var mDoc = await docRef.get();
+                                    var fDoc = await fDocRef.get();
+                                    List mFriends = List.empty(growable: true);
+                                    List fFriends = List.empty(growable: true);
+                                    try {
+                                      myFriends = mDoc.get('friends');
+                                      fFriends = fDoc.get('friends');
+                                    } catch (e) {}
+                                    mFriends.add(element);
+                                    fFriends.add(user!.email!);
+                                    FirebaseFirestore.instance
+                                        .collection("Users")
+                                        .doc(user!.email!)
+                                        .update({'friends': mFriends});
+                                    FirebaseFirestore.instance
+                                        .collection("Users")
+                                        .doc(element)
+                                        .update({'friends': fFriends});
+                                    popRequest(element);
+                                    setState(() {
+                                      myFriends = mFriends;
+                                    });
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.block,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () async {
+                                    popRequest(element);
+                                    Navigator.pop(context);
+                                  },
+                                )
+                              ],
+                            )),
+                      ),
+                    ));
+                    loadRequests();
+                  });
                   return requests;
                 },
               ),
             )
           ],
-        ), 
-        body: Padding(
-          padding: const EdgeInsets.all(8.0),
+        ),
+        body: SingleChildScrollView(
           child: Column(
             children: [
-              TextField(
-                  onEditingComplete: () async {
-                    await context.read<AuthenticationServices>().signIn(
-                          email: user?.email,
-                          password: user?.password,
-                        );
-                    foundUsers = List.empty(growable: true);
-                    await FirebaseFirestore.instance
-                        .collection("Users")
-                        .get()
-                        .then((value) {
-                      value.docs.forEach((result) async {
-                        if (query.text != '') {
-                          query.text = query.text.toLowerCase();
-                          String email = result.get('email').toLowerCase();
-                          String name = result.get('name').toLowerCase();
-                          if (email != user!.email &&
-                                  email.startsWith(query.text) ||
-                              name.startsWith(query.text)) {
-                            Users reqUser = Users(
-                                name: result.get('name'),
-                                email: result.get('email'),
-                                password: result.get('password'),
-                                language: result.get('language'),
-                                xp: result.get('xp'),
-                                credit: result.get('credit'),
-                                method: result.get('method'),
-                                settings: result.get('settings'));
+              SizedBox(
+                height: MediaQuery.of(context).size.height * .5,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    children: [
+                      TextField(
+                          onEditingComplete: () async {
+                            await context.read<AuthenticationServices>().signIn(
+                                  email: user?.email,
+                                  password: user?.password,
+                                );
+                            foundUsers = List.empty(growable: true);
+                            await FirebaseFirestore.instance
+                                .collection("Users")
+                                .get()
+                                .then((value) {
+                              value.docs.forEach((result) async {
+                                if (query.text != '') {
+                                  query.text = query.text.toLowerCase();
+                                  String email =
+                                      result.get('email').toLowerCase();
+                                  String name =
+                                      result.get('name').toLowerCase();
+                                  if (email != user!.email &&
+                                          email.startsWith(query.text) ||
+                                      name.startsWith(query.text)) {
+                                    Users reqUser = Users(
+                                        name: result.get('name'),
+                                        email: result.get('email'),
+                                        password: result.get('password'),
+                                        language: result.get('language'),
+                                        xp: result.get('xp'),
+                                        credit: result.get('credit'),
+                                        method: result.get('method'),
+                                        settings: result.get('settings'));
+                                    DocumentReference docRef = FirebaseFirestore
+                                        .instance
+                                        .collection("Users")
+                                        .doc(reqUser.email);
+                                    var document = await docRef.get();
+                                    setState(() {
+                                      foundUsers.add(reqUser);
+                                      var reqs;
+                                      try {
+                                        reqs = document.get('requests');
+                                        if (reqs != '' &&
+                                            document
+                                                .get('requests')
+                                                .split(', ')
+                                                .contains(user!.email)) {
+                                          alreadyRequested
+                                              .add(foundUsers.last.email!);
+                                        }
+                                      } catch (e) {}
+                                    });
+                                  }
+                                }
+                              });
+                            });
+                          },
+                          controller: query,
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                              labelText: 'searchUser'.tr(),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)))),
+                      ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: foundUsers.length,
+                          itemBuilder: (BuildContext context, int idx) {
                             DocumentReference docRef = FirebaseFirestore
                                 .instance
                                 .collection("Users")
-                                .doc(reqUser.email);
-                            var document = await docRef.get();
-                            setState(() {
-                              foundUsers.add(reqUser);
-                              var reqs;
-                              try {
-                                reqs = document.get('requests');
-                                if (reqs != '' &&
-                                    document
-                                        .get('requests')
-                                        .split(', ')
-                                        .contains(user!.email)) {
-                                  alreadyRequested.add(foundUsers.last.email!);
-                                }
-                              } catch (e) {}
-                            });
-                          }
-                        }
-                      });
-                    });
-                  },
-                  controller: query,
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                      labelText: 'searchUser'.tr(),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)))),
+                                .doc(foundUsers[idx].email);
+                            return ListTile(
+                              leading: Text(foundUsers[idx].name!),
+                              trailing: alreadyRequested
+                                      .contains(foundUsers[idx].email)
+                                  ? ElevatedButton.icon(
+                                      onPressed: () async {
+                                        var document = await docRef.get();
+                                        List usersRequested =
+                                            document.get('requests');
+                                        usersRequested.removeWhere((element) =>
+                                            element == user!.email!);
+                                        await FirebaseFirestore.instance
+                                            .collection("Users")
+                                            .doc(foundUsers[idx].email)
+                                            .update(
+                                                {'requests': usersRequested});
+                                        setState(() {
+                                          alreadyRequested
+                                              .remove(foundUsers[idx].email);
+                                        });
+                                      },
+                                      icon: Icon(Icons.stop_circle_rounded),
+                                      label: Text('unsendFriend'.tr()))
+                                  : ElevatedButton.icon(
+                                      onPressed: () async {
+                                        List reqs = List.empty(growable: true);
+                                        var document = await docRef.get();
+                                        try {
+                                          reqs = document.get('requests');
+                                          reqs.add(user!.email);
+                                        } catch (e) {
+                                          reqs = List.filled(1, user!.email);
+                                        }
+                                        await FirebaseFirestore.instance
+                                            .collection("Users")
+                                            .doc(foundUsers[idx].email)
+                                            .update({'requests': reqs});
+
+                                        setState(() {
+                                          alreadyRequested
+                                              .add(foundUsers[idx].email!);
+                                        });
+                                      },
+                                      icon: Icon(Icons.send),
+                                      label: Text('sendFriend'.tr())),
+                            );
+                          })
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('friends'.tr()),
+              ),
               ListView.builder(
                   shrinkWrap: true,
-                  itemCount: foundUsers.length,
+                  itemCount: myFriends.length,
                   itemBuilder: (BuildContext context, int idx) {
-                    DocumentReference docRef = FirebaseFirestore.instance
-                        .collection("Users")
-                        .doc(foundUsers[idx].email);
                     return ListTile(
-                      leading: Text(foundUsers[idx].name!),
-                      trailing: alreadyRequested.contains(foundUsers[idx].email)
-                          ? ElevatedButton.icon(
-                              onPressed: () async {
-                                var document = await docRef.get();
-                                List usersRequested = document.get('requests');
-                                usersRequested.removeWhere(
-                                    (element) => element == user!.email!);
-                                await FirebaseFirestore.instance
-                                    .collection("Users")
-                                    .doc(foundUsers[idx].email)
-                                    .update({'requests': usersRequested});
-                                setState(() {
-                                  alreadyRequested
-                                      .remove(foundUsers[idx].email);
-                                });
-                              },
-                              icon: Icon(Icons.stop_circle_rounded),
-                              label: Text('unsendFriend'.tr()))
-                          : ElevatedButton.icon(
-                              onPressed: () async {
-                                List reqs = List.empty(growable: true);
-                                var document = await docRef.get();
-                                try {
-                                  reqs = document.get('requests');
-                                  reqs.add(user!.email);
-                                } catch (e) {
-                                  reqs = List.filled(1, user!.email);
-                                }
-                                await FirebaseFirestore.instance
-                                    .collection("Users")
-                                    .doc(foundUsers[idx].email)
-                                    .update({'requests': reqs});
-
-                                setState(() {
-                                  alreadyRequested.add(foundUsers[idx].email!);
-                                });
-                              },
-                              icon: Icon(Icons.send),
-                              label: Text('sendFriend'.tr())),
+                      title: Text(myFriends[idx]),
+                      trailing: ElevatedButton.icon(
+                        icon: Icon(Icons.block),
+                        label: Text('unfriend'.tr()),
+                        onPressed: () async {
+                          popFriend(myFriends[idx]);
+                        },
+                      ),
                     );
-                  })
+                  }),
             ],
           ),
         ),

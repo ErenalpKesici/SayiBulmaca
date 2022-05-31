@@ -82,7 +82,11 @@
     "skip": "Atla",
     "done": "Son",
     "welcome": "Hoş Geldiniz ",
-    "searchUser": "Email veya Ad kullanarak kullanıcı arama",
+    "searchUser": "Email veya Ad girin",
     "sendFriend": "Arkadaş isteği gönder",
-    "unsendFriend": "Arkadaş isteğini geri al"
+    "unsendFriend": "Arkadaş isteğini geri al",
+    "friendRequests": "Arkadaş İstekleri",
+    "friends": "Arkadaşlar",
+    "unfriend": "Arkadaşdan çıkar",
+    "invite": "Davet Et"
 }
