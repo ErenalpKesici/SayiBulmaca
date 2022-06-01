@@ -87,5 +87,8 @@
     "friendRequests": "Friend Requests",
     "friends": "Friends",
     "unfriend": "Remove from friends",
-    "invite": "Invite"
+    "invite": "Invite",
+    "noUser": "No user found",
+    "incomingInvite": "Incoming game invite",
+    "showInvite": "Display game invite requests"
 }

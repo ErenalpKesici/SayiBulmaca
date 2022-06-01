@@ -88,5 +88,8 @@
     "friendRequests": "Arkadaş İstekleri",
     "friends": "Arkadaşlar",
     "unfriend": "Arkadaşdan çıkar",
-    "invite": "Davet Et"
+    "invite": "Davet Et",
+    "noUser": "Kullanıcı bulunamadı",
+    "incomingInvite": "Gelen oyun daveti",
+    "showInvite": "Oyun davet isteklerini göster"
 }

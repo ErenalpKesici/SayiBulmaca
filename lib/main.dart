@@ -24,7 +24,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_signin_button/flutter_signin_button.dart';
-
+import 'account_settings.dart';
 import 'explore.dart';
 
 int randomNumber = 0, xpPerLevel = 100, selectedBottomIdx = 0;
@@ -34,7 +34,7 @@ Configuration? configuration;
 GetStorage introShown = GetStorage();
 String systemLanguage = Platform.localeName.split('_')[0];
 SharedPreferences? prefs;
-bool inviteScanning = true, currentlyScanning = false;
+bool currentlyScanning = false, signedOut = false;
 Future<Users> findUser(email) async {
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Users").doc(email);
@@ -57,12 +57,18 @@ void toMainPage(BuildContext context, Users user) {
       MaterialPageRoute(builder: (context) => SearchPageSend(user: user)));
 }
 
+void _initPrefs() async {
+  prefs = await SharedPreferences.getInstance();
+  if (prefs?.getBool('scanInvite') == null) prefs!.setBool('scanInvite', true);
+  if (prefs?.getBool('sound') == null) prefs!.setBool('sound', false);
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await EasyLocalization.ensureInitialized();
   await GetStorage.init();
-  prefs = await SharedPreferences.getInstance();
+  _initPrefs();
   introShown.writeIfNull('displayed', false);
   runApp(EasyLocalization(supportedLocales: [
     Locale('tr'),
@@ -117,6 +123,7 @@ class AuthenticationWrapper extends StatelessWidget {
         future: findUser(firebaseUser.email),
         builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
           if (snapshot.hasData) {
+            signedOut = false;
             return SearchPageSend(user: snapshot.data);
           } else
             return Center(child: CircularProgressIndicator());
@@ -152,13 +159,10 @@ class InitialPage extends State<InitialPageSend> {
   TextEditingController password = new TextEditingController();
   GoogleSignInAccount? googleAccount;
   GoogleSignIn googleSignIn = GoogleSignIn();
-  Map<String, dynamic>? _fbUserData;
-  AccessToken? _accessToken;
 
   Future<void> _fbLogin() async {
     final LoginResult result = await FacebookAuth.instance.login();
     if (result.status == LoginStatus.success) {
-      _accessToken = result.accessToken;
       final userData = await FacebookAuth.instance.getUserData();
       print(userData);
       final authResult = await context.read<AuthenticationServices>().signIn(
@@ -196,7 +200,7 @@ class InitialPage extends State<InitialPageSend> {
             method: 'facebook',
             settings: initialSettings);
       } else {
-        var document = await await FirebaseFirestore.instance
+        var document = await FirebaseFirestore.instance
             .collection('Users')
             .doc(userData['email'])
             .get();
@@ -210,18 +214,10 @@ class InitialPage extends State<InitialPageSend> {
             method: document.get('method'),
             settings: document.get('settings'));
       }
-      toMainPage(context, user);
     } else {
       print(result.status);
       print(result.message);
     }
-  }
-
-  Future<void> _fbLogOut() async {
-    await FacebookAuth.instance.logOut();
-    _accessToken = null;
-    _fbUserData = null;
-    setState(() {});
   }
 
   @override
@@ -761,7 +757,7 @@ Future<bool> logout(BuildContext context) async {
               onPressed: () async {
                 await context.read<AuthenticationServices>().signOut();
                 Navigator.pop(c, false);
-                inviteScanning = false;
+                signedOut = true;
                 Navigator.of(context).push(
                     MaterialPageRoute(builder: (context) => InitialPageSend()));
               },
@@ -791,60 +787,7 @@ class SearchPage extends State<SearchPageSend> {
   @override
   void initState() {
     checkNetwork(context);
-
-    if (currentlyScanning == false) {
-      currentlyScanning = true;
-      Timer.periodic(Duration(seconds: 1), (timer) async {
-        if (inviteScanning == false) {
-          currentlyScanning = false;
-          timer.cancel();
-        }
-        DocumentReference? docRef;
-        try {
-          docRef =
-              FirebaseFirestore.instance.collection("Users").doc(user!.email!);
-        } catch (e) {
-          timer.cancel();
-        }
-        var doc = await docRef!.get();
-        try {
-          List invites = doc.get('invite');
-          if (invites.isNotEmpty) {
-            String invite = invites.removeLast();
-            FirebaseFirestore.instance
-                .collection("Users")
-                .doc(user!.email!)
-                .update({'invite': invites});
-            showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: Text('invite'.tr()),
-                    content: Text(invite),
-                    actions: [
-                      ElevatedButton.icon(
-                          onPressed: () async {
-                            DocumentReference ref = FirebaseFirestore.instance
-                                .collection('Rooms')
-                                .doc(invite);
-                            var doc = await ref.get();
-                            List players = doc.get('players');
-                            players.add(user!.name!);
-                            FirebaseFirestore.instance
-                                .collection('Rooms')
-                                .doc(invite)
-                                .update({'players': players});
-                            // Timer.periodic(Duration, (timer) { })
-                          },
-                          icon: Icon(Icons.check_circle),
-                          label: Text('join'.tr()))
-                    ],
-                  );
-                });
-          }
-        } catch (e) {}
-      });
-    }
+    scanInvites(this.user, context);
     if (configuration == null)
       configuration = new Configuration(this.user!.settings!);
     super.initState();
@@ -1226,81 +1169,21 @@ class AccountPage extends State<AccountPageSend> {
                             color: Colors.purple, minHeight: 50);
                     }),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
-                    style:
-                        ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                    onPressed: () {
-                      Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) => UpdatePageSend(
-                                user: this.user,
-                              )));
-                    },
-                    icon: Icon(Icons.update),
-                    label: Text('update'.tr().toString(),
-                        style: TextStyle(fontSize: 30))),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
-                    style:
-                        ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                    onPressed: () async {
-                      return await showDialog(
-                          context: context,
-                          builder: (c) => AlertDialog(
-                                title: Center(
-                                    child: Text("delete".tr().toString())),
-                                content: Text(
-                                  'alertDelete'.tr().toString(),
-                                  textAlign: TextAlign.center,
-                                ),
-                                actions: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      ElevatedButton(
-                                        child: Text('no'.tr().toString()),
-                                        onPressed: () =>
-                                            Navigator.pop(c, false),
-                                      ),
-                                      SizedBox(
-                                        width: 20,
-                                      ),
-                                      ElevatedButton(
-                                        child: Text('yes'.tr().toString()),
-                                        onPressed: () async {
-                                          await context
-                                              .read<AuthenticationServices>()
-                                              .signIn(
-                                                  email: this.user!.email,
-                                                  password:
-                                                      this.user!.password);
-                                          await context
-                                              .read<AuthenticationServices>()
-                                              .delete(
-                                                  email: this.user!.email,
-                                                  password:
-                                                      this.user!.password);
-                                          FirebaseFirestore.instance
-                                              .collection('Users')
-                                              .doc(this.user!.email)
-                                              .delete();
-                                          Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      InitialPageSend()));
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ));
-                    },
-                    icon: Icon(Icons.delete),
-                    label: Text('delete'.tr().toString(),
-                        style: TextStyle(fontSize: 30))),
+              FittedBox(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ElevatedButton.icon(
+                      style:
+                          ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
+                      onPressed: () async {
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (context) =>
+                                AccountSettingsPageSend(user: user)));
+                      },
+                      icon: Icon(Icons.settings_applications),
+                      label: Text('account'.tr() + ' ' + 'settings'.tr(),
+                          style: TextStyle(fontSize: 30))),
+                ),
               ),
               FittedBox(
                 child: Padding(
@@ -1524,7 +1407,6 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   }
 
   void popInvites() async {
-    print(invited);
     invited.forEach((element) async {
       DocumentReference docRef =
           FirebaseFirestore.instance.collection("Users").doc(element);
@@ -1810,10 +1692,24 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                                 context: context,
                                                 builder: (context) {
                                                   return AlertDialog(
-                                                    title: Text('friends'.tr()),
-                                                    content: Container(
-                                                      width: 100,
-                                                      height: 100,
+                                                    title: Text(
+                                                      'friends'.tr() +
+                                                          " " +
+                                                          'invite'.tr(),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                    content: SizedBox(
+                                                      height:
+                                                          MediaQuery.of(context)
+                                                                  .size
+                                                                  .height *
+                                                              .3,
+                                                      width:
+                                                          MediaQuery.of(context)
+                                                                  .size
+                                                                  .width *
+                                                              .7,
                                                       child: StatefulBuilder(
                                                         builder: (BuildContext
                                                                 context,
@@ -1832,35 +1728,54 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                                                       (BuildContext
                                                                               context,
                                                                           int idx) {
-                                                                    print(
-                                                                        invited);
-                                                                    return invited
-                                                                            .contains(friends[idx])
-                                                                        ? Container()
-                                                                        : ListTile(
-                                                                            title:
-                                                                                Text(friends[idx].split('@').first),
-                                                                            trailing:
-                                                                                ElevatedButton.icon(
-                                                                              icon: Icon(Icons.send_outlined),
-                                                                              label: Text('invite'.tr()),
-                                                                              onPressed: () async {
-                                                                                List invites = List.empty(growable: true);
-                                                                                DocumentReference docRef = FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
-                                                                                var doc = await docRef.get();
-                                                                                try {
-                                                                                  invites = doc.get('invite');
-                                                                                } catch (e) {}
-                                                                                invites.add(user!.email!);
-                                                                                FirebaseFirestore.instance.collection("Users").doc(friends[idx]).update({
-                                                                                  'invite': invites
-                                                                                });
-                                                                                setState(() {
-                                                                                  invited.add(friends[idx]);
-                                                                                });
-                                                                              },
-                                                                            ),
-                                                                          );
+                                                                    return ListTile(
+                                                                      title: Text(friends[
+                                                                              idx]
+                                                                          .split(
+                                                                              '@')
+                                                                          .first),
+                                                                      trailing:
+                                                                          ElevatedButton
+                                                                              .icon(
+                                                                        icon: Icon(
+                                                                            Icons.send_outlined),
+                                                                        label: Text(
+                                                                            'invite'.tr()),
+                                                                        onPressed:
+                                                                            () async {
+                                                                          List
+                                                                              invites =
+                                                                              List.empty(growable: true);
+                                                                          DocumentReference
+                                                                              docRef =
+                                                                              FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
+                                                                          var doc =
+                                                                              await docRef.get();
+                                                                          try {
+                                                                            invites =
+                                                                                doc.get('invite');
+                                                                          } catch (e) {}
+                                                                          invites
+                                                                              .add(user!.email!);
+                                                                          FirebaseFirestore
+                                                                              .instance
+                                                                              .collection(
+                                                                                  "Users")
+                                                                              .doc(friends[
+                                                                                  idx])
+                                                                              .update({
+                                                                            'invite':
+                                                                                invites
+                                                                          });
+                                                                          setState(
+                                                                              () {
+                                                                            invited.add(friends[idx]);
+                                                                          });
+                                                                          Navigator.pop(
+                                                                              context);
+                                                                        },
+                                                                      ),
+                                                                    );
                                                                   });
                                                         },
                                                       ),
@@ -2325,20 +2240,18 @@ class GamePage extends State<GamePageSend> {
           FirebaseFirestore.instance.collection("Rooms").doc(this.room);
       var document = await doc.get();
       if (document.exists) {
-        List<String> players = document.get('players').split(', ');
-        if (this.room == this.user?.email && players.length - 1 == 1)
+        List players = document.get('players');
+        if (this.room == this.user?.email && players.length == 1)
           FirebaseFirestore.instance
               .collection('Rooms')
               .doc(this.room)
               .delete();
         else {
-          String newPlayers = "";
-          for (int i = 0; i < players.length - 1; i++)
-            if (players[i] != this.user?.name) newPlayers += players[i] + ', ';
+          players.removeWhere((element) => element == this.user?.name);
           FirebaseFirestore.instance
               .collection('Rooms')
               .doc(this.room)
-              .update({'players': newPlayers});
+              .update({'players': players});
         }
       }
     } else
@@ -2394,10 +2307,8 @@ class GamePage extends State<GamePageSend> {
   Widget gameScreen() {
     String title = 'title'.tr().toString();
     if (options!.bestOf > 1)
-      title += 'Round ' +
-          roundCounter.toString() +
-          "/" +
-          this.options!.bestOf.toString();
+      title +=
+          ' ' + roundCounter.toString() + "/" + this.options!.bestOf.toString();
     return WillPopScope(
       onWillPop: (() => onWillPop(context)),
       child: Scaffold(

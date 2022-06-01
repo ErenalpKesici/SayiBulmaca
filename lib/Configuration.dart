@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
@@ -7,9 +9,9 @@ import 'Users.dart';
 
 class Configuration {
   String? sound;
-  Configuration(String settings){
+  Configuration(String settings) {
     List<String> sets = settings.split(', ');
-    for(int i=0;i<sets.length - 1;i++){
+    for (int i = 0; i < sets.length - 1; i++) {
       sound = sets[i].split(':')[1];
     }
   }
@@ -23,49 +25,54 @@ class SettingsPageSend extends StatefulWidget {
     return SettingsPage(this.user);
   }
 }
-class SettingsPage extends State<SettingsPageSend>{
+
+class SettingsPage extends State<SettingsPageSend> {
   Users? user;
   String? lang;
   bool? sound;
+  bool? scanInvite;
   SettingsPage(this.user);
   List<Color?>? languageColor = List.empty(growable: true);
   @override
   void initState() {
     print(configuration?.sound);
-    sound = configuration?.sound=='true'?true:false;
+    sound = configuration?.sound == 'true' ? true : false;
     super.initState();
   }
+
   @override
   Widget build(BuildContext context) {
-    if(languageColor!.isEmpty){
-      if(this.user?.language == 'tr'){
+    if (languageColor!.isEmpty) {
+      if (this.user?.language == 'tr') {
         languageColor!.add(Theme.of(context).primaryColor);
         languageColor!.add(Colors.pink[100]);
-      }
-      else if(this.user?.language == 'en'){
+      } else if (this.user?.language == 'en') {
         languageColor!.add(Colors.pink[100]);
         languageColor!.add(Theme.of(context).primaryColor);
       }
     }
     return WillPopScope(
-      onWillPop: () async{
+      onWillPop: () async {
         toMainPage(context, user!);
         return true;
       },
       child: Scaffold(
         bottomNavigationBar: BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,  
-      items:  bottomNavItems(),
-      currentIndex: selectedBottomIdx,
-      onTap: (int tappedIdx){
-        if(selectedBottomIdx == tappedIdx)return;
-        setState(() {
-          selectedBottomIdx = tappedIdx;
-        });
-        navigateBottom(context, this.user!);
-      },
-    ),
-        appBar: AppBar(leading: Container(), title: Text('settings'.tr().toString()), centerTitle: true, 
+          type: BottomNavigationBarType.fixed,
+          items: bottomNavItems(),
+          currentIndex: selectedBottomIdx,
+          onTap: (int tappedIdx) {
+            if (selectedBottomIdx == tappedIdx) return;
+            setState(() {
+              selectedBottomIdx = tappedIdx;
+            });
+            navigateBottom(context, this.user!);
+          },
+        ),
+        appBar: AppBar(
+          leading: Container(),
+          title: Text('settings'.tr().toString()),
+          centerTitle: true,
           actions: [
             Container(
               color: languageColor?[0],
@@ -75,25 +82,35 @@ class SettingsPage extends State<SettingsPageSend>{
                     languageColor?[1] = Theme.of(context).primaryColor;
                     languageColor?[0] = Colors.pink[100];
                     this.user?.language = 'en';
-                    FirebaseFirestore.instance.collection('Users').doc(this.user?.email).update({'language': this.user?.language});
-                    EasyLocalization.of(context)!.setLocale(Locale(this.user!.language!));
+                    FirebaseFirestore.instance
+                        .collection('Users')
+                        .doc(this.user?.email)
+                        .update({'language': this.user?.language});
+                    EasyLocalization.of(context)!
+                        .setLocale(Locale(this.user!.language!));
                   });
                 },
-                icon: Image.asset("assets/imgs/en.png"),),
+                icon: Image.asset("assets/imgs/en.png"),
+              ),
             ),
             Container(
-                color: languageColor?[1],
+              color: languageColor?[1],
               child: IconButton(
                 onPressed: () {
                   setState(() {
                     languageColor?[0] = Theme.of(context).primaryColor;
                     languageColor?[1] = Colors.pink[100];
                     this.user?.language = 'tr';
-                    FirebaseFirestore.instance.collection('Users').doc(this.user?.email).update({'language': this.user?.language});
-                    EasyLocalization.of(context)!.setLocale(Locale(this.user!.language!));
+                    FirebaseFirestore.instance
+                        .collection('Users')
+                        .doc(this.user?.email)
+                        .update({'language': this.user?.language});
+                    EasyLocalization.of(context)!
+                        .setLocale(Locale(this.user!.language!));
                   });
                 },
-                icon: Image.asset("assets/imgs/tr.png"),),
+                icon: Image.asset("assets/imgs/tr.png"),
+              ),
             ),
           ],
         ),
@@ -101,21 +118,85 @@ class SettingsPage extends State<SettingsPageSend>{
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CheckboxListTile(
-                title: Text('soundEffects'.tr().toString(), style: TextStyle(fontSize: 24)),
-                value: sound,
-                onChanged: (value) {
+              title: Text('soundEffects'.tr().toString()),
+              value: prefs?.getBool('sound') ?? false,
+              onChanged: (value) {
+                setState(() {
+                  prefs?.setBool('sound', value!);
+                });
+              },
+              controlAffinity: ListTileControlAffinity.trailing,
+            ),
+            CheckboxListTile(
+                title: Text('showInvite'.tr()),
+                value: prefs?.getBool('scanInvite') ?? true,
+                onChanged: (val) {
                   setState(() {
-                    sound = value!;
+                    prefs?.setBool('scanInvite', val!);
                   });
-                  configuration?.sound = sound.toString();
-                  print(configuration?.sound);
-                  FirebaseFirestore.instance.collection('Users').doc(this.user?.email).update({'settings': 'sound:' + sound.toString()+ ", "});
-                },
-                controlAffinity: ListTileControlAffinity.trailing, 
-              ),
+                  if (prefs?.getBool('scanInvite') == true)
+                    scanInvites(this.user, context);
+                  print(prefs?.getBool('scanInvite'));
+                }),
           ],
         ),
       ),
     );
+  }
+}
+
+void scanInvites(Users? user, BuildContext context) async {
+  if (currentlyScanning == false) {
+    currentlyScanning = true;
+    Timer.periodic(Duration(seconds: 5), (timer) async {
+      if (signedOut == true ||
+          prefs?.getBool('scanInvite') == null ||
+          prefs?.getBool('scanInvite') == false) {
+        currentlyScanning = false;
+        timer.cancel();
+        return;
+      }
+      DocumentReference? docRef;
+      try {
+        docRef =
+            FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+      } catch (e) {
+        timer.cancel();
+      }
+      var doc = await docRef!.get();
+      try {
+        List invites = doc.get('invite');
+        if (invites.isNotEmpty) {
+          String invite = invites.removeLast();
+          FirebaseFirestore.instance
+              .collection("Users")
+              .doc(user!.email!)
+              .update({'invite': invites});
+          showDialog(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  title: Text('incomingInvite'.tr()),
+                  content: Text(invite),
+                  actions: [
+                    Center(
+                      child: ElevatedButton.icon(
+                          onPressed: () async {
+                            DocumentReference ref = FirebaseFirestore.instance
+                                .collection('Rooms')
+                                .doc(invite);
+                            var doc = await ref.get();
+                            List players = doc.get('players');
+                            joinDialog(context, invite, players, user);
+                          },
+                          icon: Icon(Icons.check_circle),
+                          label: Text('join'.tr())),
+                    )
+                  ],
+                );
+              });
+        }
+      } catch (e) {}
+    });
   }
 }
