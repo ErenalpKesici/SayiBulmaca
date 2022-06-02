@@ -7,16 +7,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:sayibulmaca/main.dart';
 import 'Users.dart';
 
-class Configuration {
-  String? sound;
-  Configuration(String settings) {
-    List<String> sets = settings.split(', ');
-    for (int i = 0; i < sets.length - 1; i++) {
-      sound = sets[i].split(':')[1];
-    }
-  }
-}
-
 class SettingsPageSend extends StatefulWidget {
   final Users? user;
   SettingsPageSend({@required this.user});
@@ -33,13 +23,6 @@ class SettingsPage extends State<SettingsPageSend> {
   bool? scanInvite;
   SettingsPage(this.user);
   List<Color?>? languageColor = List.empty(growable: true);
-  @override
-  void initState() {
-    print(configuration?.sound);
-    sound = configuration?.sound == 'true' ? true : false;
-    super.initState();
-  }
-
   @override
   Widget build(BuildContext context) {
     if (languageColor!.isEmpty) {

@@ -41,7 +41,7 @@
     "explore": "Explore",    
     "credit": "Credit",
     "settings": "Settings",
-    "soundEffects": "Sound Effects",
+    "soundEffects": "Sound effects",
     "language": "Language",
     "start": "Start Game",
     "level": "Level ",
@@ -89,6 +89,7 @@
     "unfriend": "Remove from friends",
     "invite": "Invite",
     "noUser": "No user found",
+    "sentInvite": "Sent a game invite to",
     "incomingInvite": "Incoming game invite",
     "showInvite": "Display game invite requests"
 }

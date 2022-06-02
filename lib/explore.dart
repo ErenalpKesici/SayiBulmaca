@@ -93,10 +93,9 @@ class ExplorePage extends State<ExplorePageSend> {
         .collection("Users")
         .doc(user!.email!)
         .update({'friends': fs});
-
     DocumentReference fDocRef =
         FirebaseFirestore.instance.collection("Users").doc(element);
-    var fDoc = await docRef.get();
+    doc = await docRef.get();
     List fFs = doc.get('friends');
     fFs.removeWhere((inElement) => element == user!.email!);
     FirebaseFirestore.instance
@@ -271,8 +270,7 @@ class ExplorePage extends State<ExplorePageSend> {
                                             language: result.get('language'),
                                             xp: result.get('xp'),
                                             credit: result.get('credit'),
-                                            method: result.get('method'),
-                                            settings: result.get('settings'));
+                                            method: result.get('method'));
                                         DocumentReference docRef =
                                             FirebaseFirestore.instance
                                                 .collection("Users")
@@ -375,21 +373,25 @@ class ExplorePage extends State<ExplorePageSend> {
                 ],
               ),
             ),
-            ListView.builder(
-                shrinkWrap: true,
-                itemCount: myFriends.length,
-                itemBuilder: (BuildContext context, int idx) {
-                  return ListTile(
-                    title: Text(myFriends[idx]),
-                    trailing: ElevatedButton.icon(
-                      icon: Icon(Icons.block),
-                      label: Text('unfriend'.tr()),
-                      onPressed: () async {
-                        popFriend(myFriends[idx]);
-                      },
-                    ),
-                  );
-                }),
+            myFriends.isEmpty
+                ? Center(
+                    child: Text('noUser'.tr()),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: myFriends.length,
+                    itemBuilder: (BuildContext context, int idx) {
+                      return ListTile(
+                        title: Text(myFriends[idx]),
+                        trailing: ElevatedButton.icon(
+                          icon: Icon(Icons.block),
+                          label: Text('unfriend'.tr()),
+                          onPressed: () async {
+                            popFriend(myFriends[idx]);
+                          },
+                        ),
+                      );
+                    }),
           ]),
         ),
       ),

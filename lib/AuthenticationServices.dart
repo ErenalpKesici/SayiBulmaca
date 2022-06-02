@@ -5,7 +5,6 @@ class AuthenticationServices {
   AuthenticationServices(this.fbAuth);
   Stream<User?> get authStateChanges => fbAuth.authStateChanges();
   Future<int> signIn({String? email, String? password}) async {
-    print(email);
     try {
       await fbAuth.signInWithEmailAndPassword(
           email: email!, password: password!);
@@ -58,6 +57,15 @@ class AuthenticationServices {
     try {
       await fbAuth.createUserWithEmailAndPassword(
           email: email!, password: password!);
+      return 1;
+    } on FirebaseAuthException {
+      return 0;
+    }
+  }
+
+  Future<int> signUpGoogle({required AuthCredential credential}) async {
+    try {
+      await fbAuth.signInWithCredential(credential);
       return 1;
     } on FirebaseAuthException {
       return 0;

@@ -29,8 +29,6 @@ import 'explore.dart';
 
 int randomNumber = 0, xpPerLevel = 100, selectedBottomIdx = 0;
 Timer? timerSeconds, timerPlayers;
-String initialSettings = 'sound:false, ';
-Configuration? configuration;
 GetStorage introShown = GetStorage();
 String systemLanguage = Platform.localeName.split('_')[0];
 SharedPreferences? prefs;
@@ -46,8 +44,7 @@ Future<Users> findUser(email) async {
       language: document.get('language'),
       xp: document.get('xp'),
       credit: document.get('credit'),
-      method: document.get('method'),
-      settings: document.get('settings'));
+      method: document.get('method'));
   return ret;
 }
 
@@ -164,12 +161,10 @@ class InitialPage extends State<InitialPageSend> {
     final LoginResult result = await FacebookAuth.instance.login();
     if (result.status == LoginStatus.success) {
       final userData = await FacebookAuth.instance.getUserData();
-      print(userData);
       final authResult = await context.read<AuthenticationServices>().signIn(
             email: userData['email'],
             password: userData['id'],
           );
-      print(authResult);
       Users user;
       if (authResult == 0) {
         await context.read<AuthenticationServices>().signUp(
@@ -187,8 +182,7 @@ class InitialPage extends State<InitialPageSend> {
           'status': 0,
           'xp': 0,
           'language': systemLanguage,
-          'method': 'facebook',
-          'settings': initialSettings
+          'method': 'facebook'
         });
         user = new Users(
             email: userData['email'],
@@ -197,8 +191,7 @@ class InitialPage extends State<InitialPageSend> {
             language: systemLanguage,
             xp: 0,
             credit: 0,
-            method: 'facebook',
-            settings: initialSettings);
+            method: 'facebook');
       } else {
         var document = await FirebaseFirestore.instance
             .collection('Users')
@@ -211,8 +204,7 @@ class InitialPage extends State<InitialPageSend> {
             language: document.get('language'),
             xp: document.get('xp'),
             credit: document.get('credit'),
-            method: document.get('method'),
-            settings: document.get('settings'));
+            method: document.get('method'));
       }
     } else {
       print(result.status);
@@ -287,7 +279,6 @@ class InitialPage extends State<InitialPageSend> {
                               email: email.text,
                               password: password.text,
                             );
-                    print(result);
                     if (result == 1) {
                       DocumentReference doc = FirebaseFirestore.instance
                           .collection("Users")
@@ -306,7 +297,6 @@ class InitialPage extends State<InitialPageSend> {
                           'xp': 0,
                           'language': systemLanguage,
                           'method': 'google',
-                          'settings': initialSettings
                         });
                         Users user = new Users(
                             email: googleAccount!.email,
@@ -315,8 +305,7 @@ class InitialPage extends State<InitialPageSend> {
                             language: systemLanguage,
                             xp: 0,
                             credit: 0,
-                            method: 'google',
-                            settings: initialSettings);
+                            method: 'google');
                         toMainPage(context, user);
                         return;
                       }
@@ -329,8 +318,7 @@ class InitialPage extends State<InitialPageSend> {
                             language: document.get('language'),
                             xp: document.get('xp'),
                             credit: document.get('credit'),
-                            method: document.get('method'),
-                            settings: document.get('settings'));
+                            method: document.get('method'));
                         toMainPage(context, user);
                       } else
                         ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
@@ -372,8 +360,7 @@ class InitialPage extends State<InitialPageSend> {
                     language: document.get('language'),
                     xp: document.get('xp'),
                     credit: document.get('credit'),
-                    method: document.get('method'),
-                    settings: document.get('settings'));
+                    method: document.get('method'));
                 toMainPage(context, user);
               } else if (read == 0) {
                 await googleSignIn.signIn().then((userData) async {
@@ -394,8 +381,7 @@ class InitialPage extends State<InitialPageSend> {
                   'status': 0,
                   'xp': 0,
                   'language': systemLanguage,
-                  'method': 'google',
-                  'settings': initialSettings
+                  'method': 'google'
                 });
                 Users user = new Users(
                     email: googleAccount!.email,
@@ -404,8 +390,7 @@ class InitialPage extends State<InitialPageSend> {
                     language: systemLanguage,
                     xp: 0,
                     credit: 0,
-                    method: 'google',
-                    settings: initialSettings);
+                    method: 'google');
                 toMainPage(context, user);
               }
             }),
@@ -597,8 +582,7 @@ class RegisterPage extends State<RegisterPageSend> {
                       'xp': 0,
                       'credit': 0,
                       'language': selectedLanguage,
-                      'method': 'email',
-                      'settings': initialSettings
+                      'method': 'email'
                     });
                     Users user = new Users(
                         email: email.text,
@@ -607,8 +591,7 @@ class RegisterPage extends State<RegisterPageSend> {
                         language: selectedLanguage,
                         xp: 0,
                         credit: 0,
-                        method: 'email',
-                        settings: initialSettings);
+                        method: 'email');
                     toMainPage(context, user);
                     ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
                         content: Text('welcome'.tr().toString() + name.text)));
@@ -788,8 +771,6 @@ class SearchPage extends State<SearchPageSend> {
   void initState() {
     checkNetwork(context);
     scanInvites(this.user, context);
-    if (configuration == null)
-      configuration = new Configuration(this.user!.settings!);
     super.initState();
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (EasyLocalization.of(context)!.locale != Locale(this.user!.language!))
@@ -1120,87 +1101,76 @@ class AccountPage extends State<AccountPageSend> {
                 )),
           ],
         ),
-        body: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Text(
-                  this.user!.name!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 48),
-                ),
-              ),
-              SizedBox(
-                height: 50,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                child: FutureBuilder(
-                    future: getXp(),
-                    builder: (BuildContext context,
-                        AsyncSnapshot<dynamic> snapshot) {
-                      if (snapshot.hasData) {
-                        double xp = snapshot.data / xpPerLevel;
-                        int level = xp.toInt() + 1;
-                        xp -= xp.toInt();
-                        return Stack(children: [
-                          ClipRRect(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(10)),
-                              child: LinearProgressIndicator(
-                                  value: xp,
-                                  color: Colors.purple,
-                                  minHeight: 50)),
-                          Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Center(
-                              child: Text(
-                                'level'.tr().toString() + level.toString(),
-                                style: TextStyle(
-                                    fontSize: 32, color: Colors.white),
-                              ),
+        body: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Text(
+              this.user!.name!,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 48),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              child: FutureBuilder(
+                  future: getXp(),
+                  builder:
+                      (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+                    if (snapshot.hasData) {
+                      double xp = snapshot.data / xpPerLevel;
+                      int level = xp.toInt() + 1;
+                      xp -= xp.toInt();
+                      return Stack(children: [
+                        ClipRRect(
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                            child: LinearProgressIndicator(
+                                value: xp, minHeight: 50)),
+                        Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Center(
+                            child: Text(
+                              'level'.tr().toString() + level.toString(),
+                              style:
+                                  TextStyle(fontSize: 32, color: Colors.white),
                             ),
-                          )
-                        ]);
-                      } else
-                        return LinearProgressIndicator(
-                            color: Colors.purple, minHeight: 50);
-                    }),
+                          ),
+                        )
+                      ]);
+                    } else
+                      return LinearProgressIndicator(
+                          color: Colors.purple, minHeight: 50);
+                  }),
+            ),
+            FittedBox(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton.icon(
+                    style:
+                        ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
+                    onPressed: () async {
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) =>
+                              AccountSettingsPageSend(user: user)));
+                    },
+                    icon: Icon(Icons.settings_applications),
+                    label: Text('account'.tr() + ' ' + 'settings'.tr(),
+                        style: TextStyle(fontSize: 30))),
               ),
-              FittedBox(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ElevatedButton.icon(
-                      style:
-                          ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                      onPressed: () async {
-                        Navigator.of(context).push(MaterialPageRoute(
-                            builder: (context) =>
-                                AccountSettingsPageSend(user: user)));
-                      },
-                      icon: Icon(Icons.settings_applications),
-                      label: Text('account'.tr() + ' ' + 'settings'.tr(),
-                          style: TextStyle(fontSize: 30))),
-                ),
+            ),
+            FittedBox(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton.icon(
+                    style:
+                        ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
+                    onPressed: () async {
+                      logout(context);
+                    },
+                    icon: Icon(Icons.logout_rounded),
+                    label: Text('logout'.tr().toString(),
+                        style: TextStyle(fontSize: 30))),
               ),
-              FittedBox(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ElevatedButton.icon(
-                      style:
-                          ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                      onPressed: () async {
-                        logout(context);
-                      },
-                      icon: Icon(Icons.logout_rounded),
-                      label: Text('logout'.tr().toString(),
-                          style: TextStyle(fontSize: 30))),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1301,8 +1271,7 @@ class UpdatePage extends State<UpdatePageSend> {
                             language: this.user?.language,
                             xp: this.user!.xp,
                             credit: this.user!.credit,
-                            method: this.user?.method,
-                            settings: this.user!.settings);
+                            method: this.user?.method);
                         FirebaseFirestore.instance
                             .collection('Users')
                             .doc(this.user?.email)
@@ -1315,7 +1284,6 @@ class UpdatePage extends State<UpdatePageSend> {
                           'credit': 0,
                           'language': this.user?.language,
                           'method': this.user?.method,
-                          'settings': this.user?.settings
                         });
                       } else if (this.user?.method == 'google') {
                         this.user?.name = name.text;
@@ -1353,7 +1321,20 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   Color btnStartColor = Colors.grey;
   Options options = new Options.empty();
   List<String> invited = List.empty(growable: true);
+  List friends = List.empty(growable: true);
   SetupPage(this.user);
+  void _loadFriends() async {
+    DocumentReference docRef =
+        FirebaseFirestore.instance.collection("Users").doc(user!.email!);
+    var doc = await docRef.get();
+    friends = List.empty(growable: true);
+    try {
+      friends = doc.get('friends');
+    } catch (e) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     WidgetsBinding.instance.addObserver(this);
@@ -1372,6 +1353,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
     options.increasingDiff = (prefs?.getBool('increasingDiff') == null
         ? options.increasingDiff
         : prefs?.getBool('increasingDiff')!)!;
+    _loadFriends();
     super.initState();
   }
 
@@ -1469,13 +1451,13 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
           ],
         ),
         body: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             CheckboxListTile(
               title: Row(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 16.0, 0),
+                    padding: const EdgeInsets.fromLTRB(8, 0, 20, 0),
                     child: Icon(Icons.swap_horizontal_circle),
                   ),
                   Text("multiplayer".tr().toString(),
@@ -1548,52 +1530,49 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
             ),
             ListTile(
               leading: Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
                 child: Icon(Icons.numbers_rounded),
               ),
-              title: Text(
-                'bestOf'.tr().toString(),
-                style: TextStyle(fontSize: 24),
-              ),
-              trailing: DropdownButton<int>(
-                value: options.bestOf,
-                items: [1, 3, 5].map<DropdownMenuItem<int>>((int value) {
-                  return DropdownMenuItem<int>(
-                    value: value,
-                    child: Text(
-                      value.toString(),
-                      style: TextStyle(fontSize: 24),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (int? value) {
-                  setState(() {
-                    if (value == 1) {
-                      options.increasingDiff = false;
-                    }
-                    options.bestOf = value!;
-                  });
-                },
-              ),
-            ),
-            CheckboxListTile(
-              title: Row(children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 16.0, 0),
-                  child: Icon(Icons.timeline),
-                ),
-                Text("increasingDifficulty".tr().toString(),
-                    style: TextStyle(fontSize: 24))
-              ]),
-              value: options.increasingDiff,
-              onChanged: options.bestOf < 2
-                  ? null
-                  : (value) {
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'bestOf'.tr().toString(),
+                    style: TextStyle(fontSize: 24),
+                  ),
+                  DropdownButton<int>(
+                    value: options.bestOf,
+                    items: [1, 3, 5].map<DropdownMenuItem<int>>((int value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text(
+                          value.toString(),
+                          style: TextStyle(fontSize: 24),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (int? value) {
                       setState(() {
-                        options.increasingDiff = value!;
+                        if (value == 1) {
+                          options.increasingDiff = false;
+                        }
+                        options.bestOf = value!;
                       });
                     },
-              controlAffinity: ListTileControlAffinity.trailing,
+                  ),
+                ],
+              ),
+              subtitle: CheckboxListTile(
+                title: Text("increasingDifficulty".tr()),
+                value: options.increasingDiff,
+                onChanged: options.bestOf < 2
+                    ? null
+                    : (value) {
+                        setState(() {
+                          options.increasingDiff = value!;
+                        });
+                      },
+              ),
             ),
             ElevatedButton.icon(
                 onPressed: () async {
@@ -1674,116 +1653,88 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                     Padding(
                                       padding:
                                           const EdgeInsets.fromLTRB(4, 0, 4, 0),
-                                      child: ElevatedButton(
-                                          onPressed: () async {
-                                            DocumentReference docRef =
-                                                FirebaseFirestore.instance
-                                                    .collection("Users")
-                                                    .doc(user!.email!);
-                                            var doc = await docRef.get();
-                                            List friends =
-                                                List.empty(growable: true);
-                                            try {
-                                              friends = doc.get('friends');
-                                            } catch (e) {
-                                              return null;
-                                            }
-                                            showDialog(
-                                                context: context,
-                                                builder: (context) {
-                                                  return AlertDialog(
-                                                    title: Text(
-                                                      'friends'.tr() +
-                                                          " " +
-                                                          'invite'.tr(),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                    content: SizedBox(
-                                                      height:
-                                                          MediaQuery.of(context)
+                                      child: friends.isEmpty
+                                          ? null
+                                          : ElevatedButton(
+                                              onPressed: () async {
+                                                showDialog(
+                                                    context: context,
+                                                    builder: (context) {
+                                                      return AlertDialog(
+                                                        title: Text(
+                                                          'friends'.tr() +
+                                                              " " +
+                                                              'invite'.tr(),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ),
+                                                        content: SizedBox(
+                                                          height: MediaQuery.of(
+                                                                      context)
                                                                   .size
                                                                   .height *
                                                               .3,
-                                                      width:
-                                                          MediaQuery.of(context)
+                                                          width: MediaQuery.of(
+                                                                      context)
                                                                   .size
                                                                   .width *
                                                               .7,
-                                                      child: StatefulBuilder(
-                                                        builder: (BuildContext
-                                                                context,
-                                                            void Function(
-                                                                    void
-                                                                        Function())
-                                                                setState) {
-                                                          return ListView
-                                                              .builder(
-                                                                  shrinkWrap:
-                                                                      true,
-                                                                  itemCount:
-                                                                      friends
-                                                                          .length,
-                                                                  itemBuilder:
-                                                                      (BuildContext
-                                                                              context,
-                                                                          int idx) {
-                                                                    return ListTile(
-                                                                      title: Text(friends[
-                                                                              idx]
-                                                                          .split(
-                                                                              '@')
-                                                                          .first),
-                                                                      trailing:
-                                                                          ElevatedButton
-                                                                              .icon(
-                                                                        icon: Icon(
-                                                                            Icons.send_outlined),
-                                                                        label: Text(
-                                                                            'invite'.tr()),
-                                                                        onPressed:
-                                                                            () async {
-                                                                          List
-                                                                              invites =
-                                                                              List.empty(growable: true);
-                                                                          DocumentReference
-                                                                              docRef =
-                                                                              FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
-                                                                          var doc =
-                                                                              await docRef.get();
-                                                                          try {
-                                                                            invites =
-                                                                                doc.get('invite');
-                                                                          } catch (e) {}
-                                                                          invites
-                                                                              .add(user!.email!);
-                                                                          FirebaseFirestore
-                                                                              .instance
-                                                                              .collection(
-                                                                                  "Users")
-                                                                              .doc(friends[
-                                                                                  idx])
-                                                                              .update({
-                                                                            'invite':
-                                                                                invites
-                                                                          });
-                                                                          setState(
-                                                                              () {
-                                                                            invited.add(friends[idx]);
-                                                                          });
-                                                                          Navigator.pop(
-                                                                              context);
-                                                                        },
-                                                                      ),
-                                                                    );
-                                                                  });
-                                                        },
-                                                      ),
-                                                    ),
-                                                  );
-                                                });
-                                          },
-                                          child: Text('invite'.tr())),
+                                                          child:
+                                                              StatefulBuilder(
+                                                            builder: (BuildContext
+                                                                    context,
+                                                                void Function(
+                                                                        void
+                                                                            Function())
+                                                                    setState) {
+                                                              return ListView
+                                                                  .builder(
+                                                                      shrinkWrap:
+                                                                          true,
+                                                                      itemCount:
+                                                                          friends
+                                                                              .length,
+                                                                      itemBuilder:
+                                                                          (BuildContext context,
+                                                                              int idx) {
+                                                                        return ListTile(
+                                                                          title: Text(friends[idx]
+                                                                              .split('@')
+                                                                              .first),
+                                                                          trailing:
+                                                                              ElevatedButton.icon(
+                                                                            icon:
+                                                                                Icon(Icons.send_outlined),
+                                                                            label:
+                                                                                Text('invite'.tr()),
+                                                                            onPressed:
+                                                                                () async {
+                                                                              List invites = List.empty(growable: true);
+                                                                              DocumentReference docRef = FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
+                                                                              var doc = await docRef.get();
+                                                                              try {
+                                                                                invites = doc.get('invite');
+                                                                              } catch (e) {}
+                                                                              invites.add(user!.email!);
+                                                                              FirebaseFirestore.instance.collection("Users").doc(friends[idx]).update({
+                                                                                'invite': invites
+                                                                              });
+                                                                              setState(() {
+                                                                                invited.add(friends[idx]);
+                                                                              });
+                                                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('sentInvite'.tr() + ': ' + friends[idx])));
+                                                                              Navigator.pop(context);
+                                                                            },
+                                                                          ),
+                                                                        );
+                                                                      });
+                                                            },
+                                                          ),
+                                                        ),
+                                                      );
+                                                    });
+                                              },
+                                              child: Text('invite'.tr())),
                                     ),
                                     ElevatedButton(
                                         onPressed: playersFound.length > 1
@@ -1961,7 +1912,7 @@ class GamePage extends State<GamePageSend> {
     else
       entryList.insert(0, new Entry(1, entered.text, dogru, yanlis, kazandi));
     if (kazandi) {
-      if (configuration?.sound == 'true') {
+      if (prefs?.get('sound') == 'true') {
         AudioCache ac = new AudioCache();
         await ac.play('sounds/success.mp3');
         ac.clearAll();
@@ -2072,15 +2023,15 @@ class GamePage extends State<GamePageSend> {
                 content: Text(
                     'nextRound'.tr().toString() + ': ' + cd.toString(),
                     textAlign: TextAlign.center),
-                actions: <Widget>[
-                  ElevatedButton(
-                      onPressed: () {
-                        leaveGame();
-                        Navigator.pop(context);
-                        toMainPage(context, this.user!);
-                      },
-                      child: Center(child: Text("leave".tr().toString()))),
-                ],
+                // actions: <Widget>[
+                //   ElevatedButton(
+                //       onPressed: () {
+                //         leaveGame();
+                //         Navigator.pop(context);
+                //         toMainPage(context, this.user!);
+                //       },
+                //       child: Center(child: Text("leave".tr().toString()))),
+                // ],
               );
             });
           });
@@ -2307,8 +2258,10 @@ class GamePage extends State<GamePageSend> {
   Widget gameScreen() {
     String title = 'title'.tr().toString();
     if (options!.bestOf > 1)
-      title +=
-          ' ' + roundCounter.toString() + "/" + this.options!.bestOf.toString();
+      title += ' - ' +
+          roundCounter.toString() +
+          "/" +
+          this.options!.bestOf.toString();
     return WillPopScope(
       onWillPop: (() => onWillPop(context)),
       child: Scaffold(
@@ -2321,7 +2274,7 @@ class GamePage extends State<GamePageSend> {
                   if (!guessEnabled) return;
                   int remaining = await buyDigit(this.user!.email!, 100);
                   if (remaining > -1) {
-                    if (configuration?.sound == 'true') {
+                    if (prefs?.get('sound') == 'true') {
                       AudioCache ac = new AudioCache();
                       await ac.play('sounds/coin.mp3');
                       ac.clearAll();
