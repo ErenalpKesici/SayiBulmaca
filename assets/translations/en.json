@@ -1,5 +1,6 @@
 {
     "title": "Guess the Number",
+    "setup": "Setup a Game",
     "login": "Sign In",
     "loginEmail": "Sign In with Email",
     "loginGoogle": "Continue with Google",
@@ -22,7 +23,7 @@
     "yes": "Yes",
     "no": "No",
     "apply": "Apply",
-    "waitingStart": "Waiting for game to begin",
+    "waitingStart": "Waiting for the game to begin",
     "waitingPlayers": "Waiting for players",
     "found": " players found...",
     "abort": "Abort",

@@ -1,5 +1,6 @@
 {
     "title": "Sayı Bulmaca",
+    "setup": "Oyun Kurma",
     "login": "Giriş Yap",
     "loginEmail": "Email ile Giriş Yap",
     "loginGoogle": "Google ile Devam et",

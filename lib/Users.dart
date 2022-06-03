@@ -15,4 +15,13 @@ class Users {
       required this.xp,
       required this.credit,
       required this.method});
+  Users.fromJson(Map<String, dynamic> json)
+      : name = json['name'],
+        email = json['email'],
+        picture = json['picture'];
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'email': email,
+        'picture': picture,
+      };
 }
