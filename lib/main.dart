@@ -1599,8 +1599,8 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                       'game': options.game,
                       'length': options.length,
                       'status': 'ready',
-                      'scores': List.filled(1, ''),
                       'bestOf': options.bestOf,
+                      'scores': List.filled(1, ''),
                       'duration': options.duration,
                       'roundInserted': false,
                       'increasingDiff': options.increasingDiff
@@ -1936,8 +1936,8 @@ class GamePage extends State<GamePageSend> {
       List prevScores = document.get('scores');
       List players = document.get('players');
       prevScores[players.indexWhere((element) =>
-              jsonDecode(element)['email'] == this.user!.email!)] +=(
-          score.toString()+'-');
+              jsonDecode(element)['email'] == this.user!.email!)] +=
+          score.toString();
       FirebaseFirestore.instance
           .collection('Rooms')
           .doc(this.room)
@@ -2024,10 +2024,10 @@ class GamePage extends State<GamePageSend> {
     var document = await doc.get();
     List players = document.get('players');
     List scores = document.get('scores');
-    for(int i=0;i<scores.length;i++){
-      if(!scores[i].endsWith('-'))
-      scores[i] += '-';
-    }
+    // for(int i=0;i<scores.length;i++){
+    //   if(!scores[i].endsWith('-'))
+    //   scores[i] += '-';
+    // }
     // scores[players.indexWhere(
     //     (element) => jsonDecode(element)['email'] == this.user!.email!)] += '-';
     FirebaseFirestore.instance
@@ -2130,11 +2130,7 @@ class GamePage extends State<GamePageSend> {
     var document = await doc.get();
     if (!document.exists) return;
     bool inserted = false;
-    try {
       inserted = document.get('roundInserted');
-    } catch (e) {
-      return;
-    }
     if (!inserted) {
       FirebaseFirestore.instance
           .collection("Rooms")
@@ -2143,15 +2139,14 @@ class GamePage extends State<GamePageSend> {
       var scores = document.get('scores');
       bool increasingDiff = document.get('increasingDiff');
       roundCounter = scores.first.split('-').length;
-      await FirebaseFirestore.instance
-          .collection("Rooms")
-          .doc(this.room)
-          .update({'number': findRandom(options?.length)});
       if (increasingDiff) options?.length++;
+      for(int i=0;i<scores.length;i++){
+        scores[i] += '-';
+      }
       await FirebaseFirestore.instance
           .collection("Rooms")
           .doc(this.room)
-          .update({'length': options?.length});
+          .update({'length': options?.length, 'number': findRandom(options?.length), 'scores': scores});
     } else
       options?.length = document.get('length');
     initializeNumber();
@@ -2162,7 +2157,8 @@ class GamePage extends State<GamePageSend> {
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     List scores = document.get('scores');
-    return scores.every((element) {print(element.split('-').length - 1); print(options!.bestOf); return element.split('-').length -1 < options!.bestOf && element.length > 1 && element.endsWith('-');});
+    return scores.every((element) {
+       return element.split('-').length - 1 <= options!.bestOf && element.length > 1 && !element.endsWith('-');});
   }
 
   void startTimer() async {
@@ -2194,7 +2190,6 @@ class GamePage extends State<GamePageSend> {
     insertRound();
     currentDuration = options!.duration;
     startTimer();
-
     super.initState();
   }
 
