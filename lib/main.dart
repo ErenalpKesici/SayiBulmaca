@@ -1936,8 +1936,8 @@ class GamePage extends State<GamePageSend> {
       List prevScores = document.get('scores');
       List players = document.get('players');
       prevScores[players.indexWhere((element) =>
-              jsonDecode(element)['email'] == this.user!.email!)] +=
-          score.toString();
+              jsonDecode(element)['email'] == this.user!.email!)] +=(
+          score.toString()+'-');
       FirebaseFirestore.instance
           .collection('Rooms')
           .doc(this.room)
@@ -2015,6 +2015,7 @@ class GamePage extends State<GamePageSend> {
   }
 
   roundEnd() async {
+    print("END");
     setState(() {
       guessEnabled = false;
     });
@@ -2023,8 +2024,12 @@ class GamePage extends State<GamePageSend> {
     var document = await doc.get();
     List players = document.get('players');
     List scores = document.get('scores');
-    scores[players.indexWhere(
-        (element) => jsonDecode(element)['email'] == this.user!.email!)] += '-';
+    for(int i=0;i<scores.length;i++){
+      if(!scores[i].endsWith('-'))
+      scores[i] += '-';
+    }
+    // scores[players.indexWhere(
+    //     (element) => jsonDecode(element)['email'] == this.user!.email!)] += '-';
     FirebaseFirestore.instance
         .collection("Rooms")
         .doc(this.room!)
@@ -2157,8 +2162,7 @@ class GamePage extends State<GamePageSend> {
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     List scores = document.get('scores');
-    print(scores.toString());
-    return !scores.any((element) => element.split('-').last == '');
+    return scores.every((element) {print(element.split('-').length - 1); print(options!.bestOf); return element.split('-').length -1 < options!.bestOf && element.length > 1 && element.endsWith('-');});
   }
 
   void startTimer() async {
@@ -2372,7 +2376,7 @@ class GamePage extends State<GamePageSend> {
                                                         height: 25,
                                                         child: userDecoded[
                                                                     'picture'] !=
-                                                                ''
+                                                                '' && userDecoded['picture'] != null
                                                             ? Image.network(
                                                                 userDecoded[
                                                                     'picture'])
