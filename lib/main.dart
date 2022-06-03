@@ -33,6 +33,7 @@ GetStorage introShown = GetStorage();
 String systemLanguage = Platform.localeName.split('_')[0];
 SharedPreferences? prefs;
 bool currentlyScanning = false, signedOut = false;
+String defaultPicture = 'assets/imgs/account.png';
 Future<Users> findUser(email) async {
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Users").doc(email);
@@ -41,6 +42,7 @@ Future<Users> findUser(email) async {
       email: document.get('email'),
       password: document.get('password'),
       name: document.get('name'),
+      picture: document.get('picture'),
       language: document.get('language'),
       xp: document.get('xp'),
       credit: document.get('credit'),
@@ -165,6 +167,7 @@ class InitialPage extends State<InitialPageSend> {
             email: userData['email'],
             password: userData['id'],
           );
+      print(userData['picture']['data']['url']);
       Users user;
       if (authResult == 0) {
         await context.read<AuthenticationServices>().signUp(
@@ -178,6 +181,7 @@ class InitialPage extends State<InitialPageSend> {
           'email': userData['email'],
           'name': userData['name'],
           'password': userData['id'],
+          'picture': userData['picture']['data']['url'],
           'credit': 0,
           'status': 0,
           'xp': 0,
@@ -188,6 +192,7 @@ class InitialPage extends State<InitialPageSend> {
             email: userData['email'],
             password: userData['id'],
             name: userData['name'],
+            picture: userData['picture']['data']['url'],
             language: systemLanguage,
             xp: 0,
             credit: 0,
@@ -201,6 +206,7 @@ class InitialPage extends State<InitialPageSend> {
             email: document.get('email'),
             name: document.get('name'),
             password: document.get('password'),
+            picture: document.get('picture'),
             language: document.get('language'),
             xp: document.get('xp'),
             credit: document.get('credit'),
@@ -289,9 +295,10 @@ class InitialPage extends State<InitialPageSend> {
                             .collection('Users')
                             .doc(googleAccount!.email)
                             .set({
-                          'email': googleAccount!.email,
-                          'name': googleAccount!.displayName,
-                          'password': googleAccount!.id,
+                          'email': document.get('email'),
+                          'name': document.get('name'),
+                          'password': document.get('password'),
+                          'picture': document.get('picture'),
                           'credit': 0,
                           'status': 0,
                           'xp': 0,
@@ -299,22 +306,33 @@ class InitialPage extends State<InitialPageSend> {
                           'method': 'google',
                         });
                         Users user = new Users(
-                            email: googleAccount!.email,
-                            password: googleAccount!.id,
-                            name: googleAccount!.displayName,
+                            email: document.get('email'),
+                            password: document.get('password'),
+                            name: document.get('name'),
+                            picture: document.get('picture'),
                             language: systemLanguage,
                             xp: 0,
                             credit: 0,
-                            method: 'google');
+                            method: 'email');
                         toMainPage(context, user);
                         return;
                       }
                       if (document.get('email') == email.text &&
                           document.get('password') == password.text) {
+                        String picture = '';
+                        try {
+                          picture = document.get('picture');
+                        } catch (e) {
+                          await FirebaseFirestore.instance
+                              .collection('Users')
+                              .doc(document.get('email'))
+                              .update({'picture': picture});
+                        }
                         Users user = new Users(
                             email: document.get('email'),
                             name: document.get('name'),
                             password: document.get('password'),
+                            picture: picture,
                             language: document.get('language'),
                             xp: document.get('xp'),
                             credit: document.get('credit'),
@@ -354,9 +372,10 @@ class InitialPage extends State<InitialPageSend> {
                 var document = await doc.get();
                 if (!document.exists) return;
                 Users user = new Users(
-                    email: document.get('email'),
-                    password: document.get('password'),
-                    name: document.get('name'),
+                    email: googleAccount!.email,
+                    password: googleAccount!.id,
+                    picture: googleAccount!.photoUrl,
+                    name: googleAccount!.displayName,
                     language: document.get('language'),
                     xp: document.get('xp'),
                     credit: document.get('credit'),
@@ -377,6 +396,7 @@ class InitialPage extends State<InitialPageSend> {
                   'email': googleAccount!.email,
                   'name': googleAccount!.displayName,
                   'password': googleAccount!.id,
+                  'picture': googleAccount!.photoUrl,
                   'credit': 0,
                   'status': 0,
                   'xp': 0,
@@ -386,6 +406,7 @@ class InitialPage extends State<InitialPageSend> {
                 Users user = new Users(
                     email: googleAccount!.email,
                     password: googleAccount!.id,
+                    picture: googleAccount!.photoUrl,
                     name: googleAccount!.displayName,
                     language: systemLanguage,
                     xp: 0,
@@ -772,6 +793,7 @@ class SearchPage extends State<SearchPageSend> {
     checkNetwork(context);
     scanInvites(this.user, context);
     super.initState();
+    print(user!);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (EasyLocalization.of(context)!.locale != Locale(this.user!.language!))
         EasyLocalization.of(context)!.setLocale(Locale(this.user!.language!));
@@ -1062,6 +1084,12 @@ class AccountPage extends State<AccountPageSend> {
   }
 
   @override
+  void initState() {
+    print(user);
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
@@ -1104,42 +1132,42 @@ class AccountPage extends State<AccountPageSend> {
         body: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
+            Image.network(
+              user!.picture!,
+              width: 100,
+            ),
             Text(
               this.user!.name!,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 48),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              child: FutureBuilder(
-                  future: getXp(),
-                  builder:
-                      (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-                    if (snapshot.hasData) {
-                      double xp = snapshot.data / xpPerLevel;
-                      int level = xp.toInt() + 1;
-                      xp -= xp.toInt();
-                      return Stack(children: [
-                        ClipRRect(
-                            borderRadius: BorderRadius.all(Radius.circular(10)),
-                            child: LinearProgressIndicator(
-                                value: xp, minHeight: 50)),
-                        Padding(
-                          padding: const EdgeInsets.all(4.0),
-                          child: Center(
-                            child: Text(
-                              'level'.tr().toString() + level.toString(),
-                              style:
-                                  TextStyle(fontSize: 32, color: Colors.white),
-                            ),
+            FutureBuilder(
+                future: getXp(),
+                builder:
+                    (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+                  if (snapshot.hasData) {
+                    double xp = snapshot.data / xpPerLevel;
+                    int level = xp.toInt() + 1;
+                    xp -= xp.toInt();
+                    return Stack(children: [
+                      ClipRRect(
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          child: LinearProgressIndicator(
+                              value: xp, minHeight: 50)),
+                      Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Center(
+                          child: Text(
+                            'level'.tr().toString() + level.toString(),
+                            style: TextStyle(fontSize: 32, color: Colors.white),
                           ),
-                        )
-                      ]);
-                    } else
-                      return LinearProgressIndicator(
-                          color: Colors.purple, minHeight: 50);
-                  }),
-            ),
+                        ),
+                      )
+                    ]);
+                  } else
+                    return LinearProgressIndicator(
+                        color: Colors.purple, minHeight: 50);
+                }),
             FittedBox(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -1837,7 +1865,7 @@ class GamePage extends State<GamePageSend> {
   Options? options;
   TextEditingController entered = new TextEditingController();
   List<Entry> entryList = new List.empty(growable: true);
-  Color btnApplyColor = Colors.grey;
+  Color? btnApplyColor;
   FocusNode focused = FocusNode();
   int currentDuration = 0, totalDuration = 0, roundCounter = 0;
   List<String>? otherPlayers;
@@ -1846,28 +1874,28 @@ class GamePage extends State<GamePageSend> {
   GamePage(this.user, this.room, this.options);
 
   Future<List<String>> findPlayers(bool withWon) async {
-    List<String> ret = new List.empty(growable: true);
+    List<String> names = new List.empty(growable: true);
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     var players = document.get('players');
     if (withWon) {
       for (int i = 0; i < players.length - 1; i++)
-        ret.add(players[i] + ":" + "0");
+        names.add(players[i] + ":" + "0");
       List<String> wins = document.get('won').split('-');
       String currentWins = wins[wins.length - 1];
       if (currentWins != '') {
         List<String> playersWon = currentWins.split(', ');
-        for (int i = 0; i < ret.length; i++) {
+        for (int i = 0; i < names.length; i++) {
           for (int j = 0; j < playersWon.length - 1; j++) {
-            String player = ret[i].split(':')[0];
-            if (player == playersWon[j].split(':')[0]) ret[i] = player + ':1';
+            String player = names[i].split(':')[0];
+            if (player == playersWon[j].split(':')[0]) names[i] = player + ':1';
           }
         }
       }
     } else
-      for (int i = 0; i < players.length; i++) ret.add(players[i]);
-    return ret;
+      for (int i = 0; i < players.length; i++) names.add(players[i]);
+    return names;
   }
 
   void initializeNumber() async {
@@ -1885,7 +1913,7 @@ class GamePage extends State<GamePageSend> {
 
   void processInput() async {
     print(randomNumber);
-    if (btnApplyColor == Colors.grey) return;
+    if (btnApplyColor == Theme.of(context).disabledColor) return;
     String rndNumber = randomNumber.toString();
     String tmpEntered = entered.text;
     int dogru = 0, yanlis = 0;
@@ -1944,7 +1972,7 @@ class GamePage extends State<GamePageSend> {
       kazandi = true;
     }
     entered.clear();
-    btnApplyColor = Colors.grey;
+    btnApplyColor = Theme.of(context).disabledColor;
   }
 
   Widget displayNumber() {
@@ -2117,7 +2145,12 @@ class GamePage extends State<GamePageSend> {
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     if (!document.exists) return;
-    var inserted = document.get('roundInserted');
+    bool inserted = false;
+    try {
+      inserted = document.get('roundInserted');
+    } catch (e) {
+      return;
+    }
     if (!inserted) {
       FirebaseFirestore.instance
           .collection("Rooms")
@@ -2177,6 +2210,9 @@ class GamePage extends State<GamePageSend> {
 
   @override
   void initState() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      btnApplyColor = Theme.of(context).disabledColor;
+    });
     insertRound();
     currentDuration = options!.duration;
     startTimer();
@@ -2415,9 +2451,10 @@ class GamePage extends State<GamePageSend> {
                               entered.text[0] == '0') entered.clear();
                           if (randomNumber.toString().length !=
                               entered.text.length)
-                            btnApplyColor = Colors.grey;
+                            btnApplyColor = Theme.of(context).disabledColor;
                           else
-                            btnApplyColor = Theme.of(context).backgroundColor;
+                            btnApplyColor =
+                                Theme.of(context).appBarTheme.backgroundColor;
                         });
                       },
                     ),
