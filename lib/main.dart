@@ -1130,10 +1130,12 @@ class AccountPage extends State<AccountPageSend> {
         body: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Image.network(
-              user!.picture!,
-              width: 100,
-            ),
+            user!.picture! != ''
+                ? Image.network(
+                    user!.picture!,
+                    width: 100,
+                  )
+                : Container(),
             Text(
               this.user!.name!,
               textAlign: TextAlign.center,
