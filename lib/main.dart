@@ -675,11 +675,11 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
       timerPlayers?.cancel();
     }
   });
-  currentPlayers.add(user.name!);
-  FirebaseFirestore.instance
-      .collection('Rooms')
-      .doc(foundRoom)
-      .update({'players': currentPlayers});
+  currentPlayers.add(jsonEncode(user));
+  FirebaseFirestore.instance.collection('Rooms').doc(foundRoom).update({
+    'players': currentPlayers,
+    'scores': List.filled(currentPlayers.length, '')
+  });
   showDialog(
       context: context,
       barrierDismissible: false,
@@ -692,8 +692,6 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
               setState(() {
                 playersFound = document.get('players');
               });
-            else
-              timer.cancel();
           });
           return AlertDialog(
             title: Center(child: Text("waitingStart".tr().toString())),
@@ -824,13 +822,13 @@ class SearchPage extends State<SearchPageSend> {
           title: Text('title'.tr().toString()),
           centerTitle: true,
           actions: [
-            ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => IntroductionPageSend()));
-                },
-                icon: Icon(Icons.help),
-                label: Text('')),
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => IntroductionPageSend()));
+              },
+              icon: Icon(Icons.help),
+            ),
           ],
         ),
         body: Center(
@@ -1030,11 +1028,11 @@ class JoinGamePage extends State<JoinGamePageSend> {
                               },
                               cells: [
                                 DataCell(Text(
-                                  e.currentPlayers[0].toString(),
+                                  jsonDecode(e.currentPlayers.first)['name'],
                                   textAlign: TextAlign.center,
                                 )),
                                 DataCell(Text(
-                                  (e.currentPlayers.length - 1).toString(),
+                                  (e.currentPlayers.length).toString(),
                                   textAlign: TextAlign.center,
                                 )),
                                 DataCell(Text(
@@ -1452,30 +1450,16 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
           },
         ),
         appBar: AppBar(
-          // leading: DropdownButton<String>(
-          //   value: options.game,
-          //   items: ['guess', 'another'].map<DropdownMenuItem<String>>((String value) {
-          //     return DropdownMenuItem<String>(
-          //       value: value,
-          //       child: Text(value.toString()),
-          //     );
-          //   }).toList(),
-          //   onChanged: (String? value) {
-          //     setState(() {
-          //       options.game = value!;
-          //     });
-          //   },
-          // ),
           centerTitle: true,
-          title: Text("createBtn".tr().toString()),
+          title: Text("setup".tr().toString()),
           actions: [
-            ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => IntroductionPageSend()));
-                },
-                icon: Icon(Icons.help),
-                label: Text('')),
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => IntroductionPageSend()));
+              },
+              icon: Icon(Icons.help),
+            ),
           ],
         ),
         body: Column(
@@ -1609,11 +1593,11 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                         .collection('Rooms')
                         .doc(this.user!.email)
                         .set({
-                      'players': List.filled(1, this.user!.name!),
+                      'players': List.filled(1, jsonEncode(this.user)),
                       'game': options.game,
                       'length': options.length,
                       'status': 'ready',
-                      'won': '',
+                      'scores': List.filled(1, ''),
                       'bestOf': options.bestOf,
                       'duration': options.duration,
                       'roundInserted': false,
@@ -1796,11 +1780,11 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                         .collection("Rooms")
                         .doc(this.user?.email)
                         .set({
-                      'players': List.filled(1, this.user!.name!),
+                      'players': List.filled(1, jsonEncode(this.user)),
                       'game': options.game,
                       'length': options.length,
                       'status': 'playing',
-                      'won': '',
+                      'scores': List.filled(1, ''),
                       'bestOf': options.bestOf,
                       'roundInserted': false,
                       'increasingDiff': options.increasingDiff
@@ -1873,29 +1857,23 @@ class GamePage extends State<GamePageSend> {
   String hint = '';
   GamePage(this.user, this.room, this.options);
 
-  Future<List<String>> findPlayers(bool withWon) async {
-    List<String> names = new List.empty(growable: true);
+  Future<List> findPlayers(bool _getStatus) async {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
-    var players = document.get('players');
-    if (withWon) {
-      for (int i = 0; i < players.length - 1; i++)
-        names.add(players[i] + ":" + "0");
-      List<String> wins = document.get('won').split('-');
-      String currentWins = wins[wins.length - 1];
-      if (currentWins != '') {
-        List<String> playersWon = currentWins.split(', ');
-        for (int i = 0; i < names.length; i++) {
-          for (int j = 0; j < playersWon.length - 1; j++) {
-            String player = names[i].split(':')[0];
-            if (player == playersWon[j].split(':')[0]) names[i] = player + ':1';
-          }
-        }
-      }
-    } else
-      for (int i = 0; i < players.length; i++) names.add(players[i]);
-    return names;
+    List players = document.get('players');
+    if (_getStatus) {
+      List totalScores = await _sumScores(
+          document.get('scores'), document.get('players'), true);
+      List statusList = List.empty(growable: true);
+      int idx = 0;
+      totalScores.forEach((element) {
+        statusList
+            .add({'score': element.values.first, 'player': players[idx++]});
+      });
+      return statusList;
+    }
+    return players;
   }
 
   void initializeNumber() async {
@@ -1953,10 +1931,15 @@ class GamePage extends State<GamePageSend> {
       DocumentReference doc =
           FirebaseFirestore.instance.collection("Rooms").doc(this.room);
       var document = await doc.get();
-      var prevWinners = document.get('won');
-      FirebaseFirestore.instance.collection('Rooms').doc(this.room).update({
-        'won': prevWinners + this.user!.name! + ':' + score.toString() + ", "
-      });
+      List prevScores = document.get('scores');
+      List players = document.get('players');
+      prevScores[players.indexWhere((element) =>
+              jsonDecode(element)['email'] == this.user!.email!)] +=
+          score.toString();
+      FirebaseFirestore.instance
+          .collection('Rooms')
+          .doc(this.room)
+          .update({'scores': prevScores});
       DocumentReference docUser =
           FirebaseFirestore.instance.collection("Users").doc(this.user?.email);
       var documentUser = await docUser.get();
@@ -1980,13 +1963,13 @@ class GamePage extends State<GamePageSend> {
         style: TextStyle(fontSize: 32, color: Colors.green));
   }
 
-  Widget displayResult(List<Map<String, dynamic>> userScore) {
-    print(userScore);
+  Widget displayResult(List userScore) {
     return Center(
       heightFactor: 1,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
+          headingRowHeight: 16,
           headingRowColor:
               MaterialStateColor.resolveWith((states) => Colors.black12),
           columns: [
@@ -2001,13 +1984,32 @@ class GamePage extends State<GamePageSend> {
           ],
           rows: userScore
               .map<DataRow>((e) => DataRow(cells: [
-                    DataCell(Text(e['user'].toString())),
-                    DataCell(Text(e['score'].toString())),
+                    DataCell(Text(e.keys.first)),
+                    DataCell(Text(e.values.first.toString())),
                   ]))
               .toList(),
         ),
       ),
     );
+  }
+
+  Future<List> _sumScores(List scores, List players, bool latestOnly) async {
+    int idx = 0;
+    List userScore = List.empty(growable: true);
+    scores.forEach((score) {
+      if (latestOnly) {
+        List roundScores = score.split('-');
+        int totalScore = 0;
+        roundScores.forEach((element) {
+          if (element != '') totalScore += int.parse(element);
+        });
+        userScore.add({jsonDecode(players[idx++])['name']: totalScore});
+      } else {
+        userScore
+            .add({jsonDecode(players[idx++])['name']: score.split('-').last});
+      }
+    });
+    return userScore;
   }
 
   roundEnd() async {
@@ -2017,13 +2019,16 @@ class GamePage extends State<GamePageSend> {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
-    var wins = document.get('won');
-    int cd = 3;
+    List players = document.get('players');
+    List scores = document.get('scores');
+    scores[players.indexWhere(
+        (element) => jsonDecode(element)['email'] == this.user!.email!)] += '-';
     FirebaseFirestore.instance
         .collection("Rooms")
-        .doc(this.room)
-        .update({'won': wins});
-    if (this.options!.bestOf >= document.get('won').split('-').length)
+        .doc(this.room!)
+        .update({'scores': scores});
+    int cd = 3;
+    if (this.options!.bestOf >= scores.first.split('-').length)
       showDialog(
           context: context,
           barrierDismissible: false,
@@ -2064,35 +2069,7 @@ class GamePage extends State<GamePageSend> {
             });
           });
     else {
-      List<String> gameWs = wins.split('-');
-      List<Map<String, dynamic>> userScoreTmp = List.empty(growable: true);
-      List<Map<String, dynamic>> userScore = List.empty(growable: true);
-      for (int k = 0; k < gameWs.length; k++) {
-        List<String> winners = gameWs[k].split(', ');
-        for (int i = 0; i < winners.length - 1; i++) {
-          List<String> tmp = winners[i].split(':');
-          userScoreTmp.add({'user': tmp[0], 'score': tmp[1]});
-        }
-      }
-      List<String> players = await findPlayers(false);
-      for (int i = 0; i < players.length; i++) {
-        userScore.add({'user': players[i], 'score': 0});
-      }
-      print(userScore);
-      for (int j = 0; j < userScoreTmp.length; j++)
-        for (int k = 0; k < userScore.length; k++)
-          if (userScoreTmp[j]['user'] == userScore[k]['user'])
-            userScore[k]['score'] += int.parse(userScoreTmp[j]['score']);
-      for (int i = 0; i < userScore.length; i++) {
-        //sorting
-        int maxIdx = i;
-        for (int j = i + 1; j < userScore.length; j++) {
-          if (userScore[maxIdx]['score'] < userScore[j]['score']) maxIdx = j;
-        }
-        Map<String, dynamic> temp = userScore[i];
-        userScore[i] = userScore[maxIdx];
-        userScore[maxIdx] = temp;
-      }
+      var userScores = await _sumScores(scores, document.get('players'), false);
       showDialog(
           barrierDismissible: false,
           context: context,
@@ -2103,7 +2080,7 @@ class GamePage extends State<GamePageSend> {
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 25),
                 child: Center(child: displayNumber()),
               ),
-              content: displayResult(userScore),
+              content: displayResult(userScores),
               actions: <Widget>[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -2156,13 +2133,13 @@ class GamePage extends State<GamePageSend> {
           .collection("Rooms")
           .doc(this.room)
           .update({'roundInserted': true});
-      var wins = document.get('won');
+      var scores = document.get('scores');
       bool increasingDiff = document.get('increasingDiff');
-      roundCounter = wins.split('-').length;
+      roundCounter = scores.first.split('-').length;
       await FirebaseFirestore.instance
           .collection("Rooms")
           .doc(this.room)
-          .update({'number': findRandom(options?.length), 'won': wins + '-'});
+          .update({'number': findRandom(options?.length)});
       if (increasingDiff) options?.length++;
       await FirebaseFirestore.instance
           .collection("Rooms")
@@ -2173,17 +2150,13 @@ class GamePage extends State<GamePageSend> {
     initializeNumber();
   }
 
-  Future<bool> allWon() async {
+  Future<bool> allFinished() async {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
-    List<String> wins = document.get('won').split('-');
-    var currentWins = wins[wins.length - 1];
-    if (currentWins != '') {
-      List<String> players = await findPlayers(false);
-      if (currentWins.split(', ').length - 1 >= players.length) return true;
-    }
-    return false;
+    List scores = document.get('scores');
+    print(scores.toString());
+    return !scores.any((element) => element.split('-').last == '');
   }
 
   void startTimer() async {
@@ -2193,8 +2166,7 @@ class GamePage extends State<GamePageSend> {
         timer.cancel();
         roundEnd();
       } else {
-        bool allDone = await allWon();
-        if (allDone) {
+        if (await allFinished()) {
           timerPlayers?.cancel();
           timer.cancel();
           roundEnd();
@@ -2357,8 +2329,8 @@ class GamePage extends State<GamePageSend> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 5, 20, 0),
                     child: FutureBuilder(
-                      builder: (BuildContext context,
-                          AsyncSnapshot<List<String>> snapshot) {
+                      builder:
+                          (BuildContext context, AsyncSnapshot<List> snapshot) {
                         return snapshot.hasData
                             ? SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -2369,11 +2341,12 @@ class GamePage extends State<GamePageSend> {
                                       shrinkWrap: true,
                                       itemBuilder:
                                           (BuildContext context, int idx) {
-                                        var userDone =
-                                            snapshot.data![idx].split(':');
-                                        String user = userDone[0];
-                                        int done = int.parse(userDone[1]);
-                                        if (user != this.user!.name)
+                                        var score =
+                                            snapshot.data?[idx]['score'];
+                                        var userDecoded = jsonDecode(
+                                            snapshot.data?[idx]['player']);
+                                        if (userDecoded['name'] !=
+                                            this.user!.name)
                                           return Padding(
                                             padding: const EdgeInsets.fromLTRB(
                                                 5, 0, 5, 0),
@@ -2381,7 +2354,7 @@ class GamePage extends State<GamePageSend> {
                                                 fit: BoxFit.fitHeight,
                                                 child: Column(
                                                   children: [
-                                                    done == 0
+                                                    score == 0
                                                         ? Container(
                                                             width: 50,
                                                             child:
@@ -2395,9 +2368,15 @@ class GamePage extends State<GamePageSend> {
                                                     Container(
                                                         width: 25,
                                                         height: 25,
-                                                        child: Image.asset(
-                                                            'assets/imgs/account.png')),
-                                                    Text(user)
+                                                        child: userDecoded[
+                                                                    'picture'] !=
+                                                                ''
+                                                            ? Image.network(
+                                                                userDecoded[
+                                                                    'picture'])
+                                                            : Image.asset(
+                                                                'assets/imgs/account.png')),
+                                                    Text(userDecoded['name'])
                                                   ],
                                                 )),
                                           );
