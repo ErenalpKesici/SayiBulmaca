@@ -8,6 +8,7 @@ import 'AuthenticationServices.dart';
 import 'Users.dart';
 import 'main.dart';
 import 'package:badges/badges.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 List myRequests = List.empty(growable: true);
 List myFriends = List.empty(growable: true);
@@ -136,7 +137,7 @@ class ExplorePage extends State<ExplorePageSend> {
               tabs: [
                 Tab(
                   icon: Icon(Icons.find_in_page),
-                  text: 'joinBtmBtn'.tr(),
+                  text: 'searchUser'.tr(),
                 ),
                 Tab(
                   icon: Icon(Icons.people_outlined),
@@ -239,6 +240,14 @@ class ExplorePage extends State<ExplorePageSend> {
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
                         children: [
+                          // IconButton(
+                          //     onPressed: () {
+                          //       launchUrl(
+                          //           Uri.parse(
+                          //               "https://fb.gg/me/friendfinder/682728652813701"),
+                          //           mode: LaunchMode.externalApplication);
+                          //     },
+                          //     icon: Icon(Icons.launch)),
                           TextField(
                               onEditingComplete: () async {
                                 await context
@@ -299,7 +308,7 @@ class ExplorePage extends State<ExplorePageSend> {
                               controller: query,
                               textAlign: TextAlign.center,
                               decoration: InputDecoration(
-                                  labelText: 'searchUser'.tr(),
+                                  labelText: 'searchUserHolder'.tr(),
                                   border: OutlineInputBorder(
                                       borderRadius:
                                           BorderRadius.circular(10)))),

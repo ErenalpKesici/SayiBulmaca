@@ -1,4 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class AuthenticationServices {
   final FirebaseAuth fbAuth;
@@ -63,12 +65,28 @@ class AuthenticationServices {
     }
   }
 
-  Future<int> signUpGoogle({required AuthCredential credential}) async {
-    try {
-      await fbAuth.signInWithCredential(credential);
-      return 1;
-    } on FirebaseAuthException {
-      return 0;
-    }
+  Future<void> deleteProvider(String method) async {
+    if (method == 'google')
+      await signInWithGoogle();
+    else if (method == 'facebook') await signInWithFacebook();
+    await FirebaseAuth.instance.currentUser?.delete();
+  }
+
+  Future<UserCredential> signInWithGoogle() async {
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    final GoogleSignInAuthentication? googleAuth =
+        await googleUser?.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth?.accessToken,
+      idToken: googleAuth?.idToken,
+    );
+    return await FirebaseAuth.instance.signInWithCredential(credential);
+  }
+
+  Future<UserCredential> signInWithFacebook() async {
+    final LoginResult loginResult = await FacebookAuth.instance.login();
+    final OAuthCredential facebookAuthCredential =
+        FacebookAuthProvider.credential(loginResult.accessToken!.token);
+    return FirebaseAuth.instance.signInWithCredential(facebookAuthCredential);
   }
 }

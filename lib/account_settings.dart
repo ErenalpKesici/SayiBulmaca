@@ -108,13 +108,18 @@ class AccountSettingsPage extends State<AccountSettingsPageSend> {
                                             .collection('Users')
                                             .doc(this.user!.email)
                                             .delete();
-                                        await context
-                                            .read<AuthenticationServices>()
-                                            .delete(
-                                                email: this.user!.email,
-                                                password: this.user!.password);
-                                        if (user!.method! == 'facebook')
-                                          await FacebookAuth.instance.logOut();
+                                        if (this.user!.method == 'email')
+                                          await context
+                                              .read<AuthenticationServices>()
+                                              .delete(
+                                                  email: this.user!.email,
+                                                  password:
+                                                      this.user!.password);
+                                        else
+                                          await context
+                                              .read<AuthenticationServices>()
+                                              .deleteProvider(
+                                                  this.user!.method!);
                                         signedOut = true;
                                         Navigator.of(context).push(
                                             MaterialPageRoute(

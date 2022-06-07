@@ -60,6 +60,8 @@ void _initPrefs() async {
   prefs = await SharedPreferences.getInstance();
   if (prefs?.getBool('scanInvite') == null) prefs!.setBool('scanInvite', true);
   if (prefs?.getBool('sound') == null) prefs!.setBool('sound', false);
+  if (prefs?.getBool('durationEnabled') == null)
+    prefs!.setBool('durationEnabled', false);
 }
 
 void main() async {
@@ -158,65 +160,7 @@ class InitialPage extends State<InitialPageSend> {
   TextEditingController password = new TextEditingController();
   GoogleSignInAccount? googleAccount;
   GoogleSignIn googleSignIn = GoogleSignIn();
-
-  Future<void> _fbLogin() async {
-    final LoginResult result = await FacebookAuth.instance.login();
-    if (result.status == LoginStatus.success) {
-      final userData = await FacebookAuth.instance.getUserData();
-      final authResult = await context.read<AuthenticationServices>().signIn(
-            email: userData['email'],
-            password: userData['id'],
-          );
-      print(userData['picture']['data']['url']);
-      Users user;
-      if (authResult == 0) {
-        await context.read<AuthenticationServices>().signUp(
-              email: userData['email'],
-              password: userData['id'],
-            );
-        await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(userData['email'])
-            .set({
-          'email': userData['email'],
-          'name': userData['name'],
-          'password': userData['id'],
-          'picture': userData['picture']['data']['url'],
-          'credit': 0,
-          'status': 0,
-          'xp': 0,
-          'language': systemLanguage,
-          'method': 'facebook'
-        });
-        user = new Users(
-            email: userData['email'],
-            password: userData['id'],
-            name: userData['name'],
-            picture: userData['picture']['data']['url'],
-            language: systemLanguage,
-            xp: 0,
-            credit: 0,
-            method: 'facebook');
-      } else {
-        var document = await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(userData['email'])
-            .get();
-        user = new Users(
-            email: document.get('email'),
-            name: document.get('name'),
-            password: document.get('password'),
-            picture: document.get('picture'),
-            language: document.get('language'),
-            xp: document.get('xp'),
-            credit: document.get('credit'),
-            method: document.get('method'));
-      }
-    } else {
-      print(result.status);
-      print(result.message);
-    }
-  }
+  GoogleAuthProvider google = GoogleAuthProvider();
 
   @override
   void initState() {
@@ -355,48 +299,33 @@ class InitialPage extends State<InitialPageSend> {
             ),
             SignInButton(Buttons.Google, text: 'loginGoogle.'.tr(),
                 onPressed: () async {
-              var result;
-              await googleSignIn.signIn().then((userData) async {
-                result = await context.read<AuthenticationServices>().signIn(
-                      email: userData!.email,
-                      password: userData.id,
-                    );
-                googleAccount = userData;
-              });
-              int read = await result;
-              print(read);
-              if (read == 1) {
+              UserCredential userCredential = await context
+                  .read<AuthenticationServices>()
+                  .signInWithGoogle();
+              if (!userCredential.additionalUserInfo!.isNewUser) {
                 DocumentReference doc = FirebaseFirestore.instance
                     .collection("Users")
-                    .doc(googleAccount!.email);
+                    .doc(userCredential.user!.email);
                 var document = await doc.get();
-                if (!document.exists) return;
                 Users user = new Users(
-                    email: googleAccount!.email,
-                    password: googleAccount!.id,
-                    picture: googleAccount!.photoUrl,
-                    name: googleAccount!.displayName,
+                    email: userCredential.user!.email,
+                    password: userCredential.user!.uid,
+                    picture: userCredential.user!.photoURL,
+                    name: userCredential.user!.displayName,
                     language: document.get('language'),
                     xp: document.get('xp'),
                     credit: document.get('credit'),
-                    method: document.get('method'));
+                    method: 'google');
                 toMainPage(context, user);
-              } else if (read == 0) {
-                await googleSignIn.signIn().then((userData) async {
-                  result = await context.read<AuthenticationServices>().signUp(
-                        email: userData?.email,
-                        password: userData?.id,
-                      );
-                  googleAccount = userData;
-                });
+              } else {
                 await FirebaseFirestore.instance
                     .collection('Users')
-                    .doc(googleAccount!.email)
+                    .doc(userCredential.user!.email)
                     .set({
-                  'email': googleAccount!.email,
-                  'name': googleAccount!.displayName,
-                  'password': googleAccount!.id,
-                  'picture': googleAccount!.photoUrl,
+                  'email': userCredential.user!.email,
+                  'name': userCredential.user!.displayName,
+                  'password': userCredential.user!.uid,
+                  'picture': userCredential.user!.photoURL,
                   'credit': 0,
                   'status': 0,
                   'xp': 0,
@@ -404,10 +333,10 @@ class InitialPage extends State<InitialPageSend> {
                   'method': 'google'
                 });
                 Users user = new Users(
-                    email: googleAccount!.email,
-                    password: googleAccount!.id,
-                    picture: googleAccount!.photoUrl,
-                    name: googleAccount!.displayName,
+                    email: userCredential.user!.email,
+                    password: userCredential.user!.uid,
+                    picture: userCredential.user!.photoURL,
+                    name: userCredential.user!.displayName,
                     language: systemLanguage,
                     xp: 0,
                     credit: 0,
@@ -416,24 +345,66 @@ class InitialPage extends State<InitialPageSend> {
               }
             }),
             SignInButton(
-              Buttons.Facebook,
+              Buttons.FacebookNew,
               text: "loginFacebook".tr(),
               onPressed: () async {
-                await _fbLogin();
+                UserCredential userCredential = await context
+                    .read<AuthenticationServices>()
+                    .signInWithFacebook();
+                Users? user;
+                if (userCredential.additionalUserInfo!.isNewUser) {
+                  await FirebaseFirestore.instance
+                      .collection('Users')
+                      .doc(userCredential.user!.email)
+                      .set({
+                    'email': userCredential.user!.email,
+                    'name': userCredential.user!.displayName,
+                    'password': userCredential.user!.uid,
+                    'picture': userCredential.user!.photoURL,
+                    'credit': 0,
+                    'status': 0,
+                    'xp': 0,
+                    'language': systemLanguage,
+                    'method': 'facebook'
+                  });
+                  user = new Users(
+                      email: userCredential.user!.email,
+                      password: userCredential.user!.uid,
+                      name: userCredential.user!.displayName,
+                      picture: userCredential.user!.photoURL,
+                      language: systemLanguage,
+                      xp: 0,
+                      credit: 0,
+                      method: 'facebook');
+                } else {
+                  var document = await FirebaseFirestore.instance
+                      .collection('Users')
+                      .doc(userCredential.user!.email)
+                      .get();
+                  user = new Users(
+                      email: document.get('email'),
+                      name: document.get('name'),
+                      password: document.get('password'),
+                      picture: document.get('picture'),
+                      language: document.get('language'),
+                      xp: document.get('xp'),
+                      credit: document.get('credit'),
+                      method: document.get('method'));
+                }
+                toMainPage(context, user);
               },
             ),
             SizedBox(
               height: 20,
             ),
-            ElevatedButton.icon(
-                onPressed: () async {
-                  Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => RegisterPageSend()));
-                },
-                icon: Icon(Icons.create_sharp),
-                label: Text(
-                  "noaccount".tr().toString(),
-                )),
+            SignInButton(
+              Buttons.Email,
+              onPressed: () async {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => RegisterPageSend()));
+              },
+              text: "noaccount".tr().toString(),
+            ),
             SizedBox(
               height: 25,
             ),
@@ -464,7 +435,7 @@ List<BottomNavigationBarItem> bottomNavItems() {
       label: 'createBtn'.tr().toString(),
     ),
     BottomNavigationBarItem(
-      icon: Icon(Icons.people_alt),
+      icon: Icon(Icons.explore),
       label: 'explore'.tr().toString(),
     ),
     BottomNavigationBarItem(
@@ -899,7 +870,7 @@ class SearchPage extends State<SearchPageSend> {
                     style:
                         ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
                     icon: Icon(Icons.speed_rounded),
-                    label: Text('quickJoinBtn'.tr().toString(),
+                    label: Text('gameQuickJoin'.tr(),
                         style: TextStyle(fontSize: 30))),
               ),
               SizedBox(
@@ -913,8 +884,8 @@ class SearchPage extends State<SearchPageSend> {
                             )));
                   },
                   style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                  icon: Icon(Icons.search),
-                  label: Text('joinBtn'.tr().toString(),
+                  icon: Icon(Icons.list),
+                  label: Text('gameList'.tr().toString(),
                       style: TextStyle(fontSize: 30))),
               SizedBox(
                 height: 25,
@@ -1015,7 +986,7 @@ class JoinGamePage extends State<JoinGamePageSend> {
                   columns: [
                     DataColumn(label: Text('creator'.tr().toString())),
                     DataColumn(label: Text('playerCount'.tr().toString())),
-                    DataColumn(label: Text('time'.tr().toString())),
+                    DataColumn(label: Text('timeLimit'.tr().toString())),
                     DataColumn(label: Text('digit'.tr().toString())),
                     DataColumn(label: Text('bestOf'.tr().toString())),
                   ],
@@ -1149,21 +1120,25 @@ class AccountPage extends State<AccountPageSend> {
                     double xp = snapshot.data / xpPerLevel;
                     int level = xp.toInt() + 1;
                     xp -= xp.toInt();
-                    return Stack(children: [
-                      ClipRRect(
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                          child: LinearProgressIndicator(
-                              value: xp, minHeight: 50)),
-                      Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Center(
-                          child: Text(
-                            'level'.tr().toString() + level.toString(),
-                            style: TextStyle(fontSize: 32, color: Colors.white),
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Stack(children: [
+                        ClipRRect(
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                            child: LinearProgressIndicator(
+                                value: xp, minHeight: 50)),
+                        Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Center(
+                            child: Text(
+                              'level'.tr().toString() + level.toString(),
+                              style:
+                                  TextStyle(fontSize: 32, color: Colors.white),
+                            ),
                           ),
-                        ),
-                      )
-                    ]);
+                        )
+                      ]),
+                    );
                   } else
                     return LinearProgressIndicator(
                         color: Colors.purple, minHeight: 50);
@@ -1348,6 +1323,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   Users? user;
   Color btnStartColor = Colors.grey;
   Options options = new Options.empty();
+  bool? durationEnabled;
   List<String> invited = List.empty(growable: true);
   List friends = List.empty(growable: true);
   SetupPage(this.user);
@@ -1369,6 +1345,9 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
     options.multiplayer = (prefs?.getBool('multiplayer') == null
         ? options.multiplayer
         : prefs?.getBool('multiplayer')!)!;
+    durationEnabled = (prefs?.getBool('durationEnabled') == null
+        ? durationEnabled
+        : prefs?.getBool('durationEnabled')!);
     options.duration = (prefs?.getInt('duration') == null
         ? options.duration
         : prefs?.getInt('duration')!)!;
@@ -1489,34 +1468,6 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
             ListTile(
               leading: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.timelapse),
-              ),
-              title: Text(
-                'time'.tr().toString(),
-                style: TextStyle(fontSize: 24),
-              ),
-              trailing: DropdownButton<int>(
-                value: options.duration,
-                items: [15, 30, 45, 60, 120]
-                    .map<DropdownMenuItem<int>>((int value) {
-                  return DropdownMenuItem<int>(
-                    value: value,
-                    child: Text(
-                      value.toString(),
-                      style: TextStyle(fontSize: 24),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (int? value) {
-                  setState(() {
-                    options.duration = value!;
-                  });
-                },
-              ),
-            ),
-            ListTile(
-              leading: Padding(
-                padding: const EdgeInsets.all(8.0),
                 child: Icon(Icons.height),
               ),
               title: Text(
@@ -1525,7 +1476,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
               ),
               trailing: DropdownButton<int>(
                 value: options.length,
-                items: [2, 3, 4, 5, 6, 7, 8, 9]
+                items: [3, 4, 5, 6, 7, 8, 9]
                     .map<DropdownMenuItem<int>>((int value) {
                   return DropdownMenuItem<int>(
                     value: value,
@@ -1540,6 +1491,44 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                     options.length = value!;
                   });
                 },
+              ),
+            ),
+            CheckboxListTile(
+              value: durationEnabled ?? false,
+              onChanged: (bool? active) {
+                setState(() {
+                  durationEnabled = active!;
+                  print(durationEnabled);
+                });
+              },
+              title: ListTile(
+                enabled: durationEnabled ?? false,
+                leading: Icon(Icons.timelapse),
+                title: Text(
+                  'timeLimit'.tr(),
+                  style: TextStyle(fontSize: 24),
+                ),
+                trailing: DropdownButton<dynamic>(
+                  value: options.duration == -1 ? 15 : options.duration,
+                  items: [15, 30, 45, 60, 120]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(
+                        value.toString(),
+                        style: TextStyle(fontSize: 24),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: durationEnabled == null || durationEnabled == false
+                      ? null
+                      : (value) {
+                          print(value);
+                          setState(() {
+                            options.duration = value!;
+                          });
+                        },
+                ),
               ),
             ),
             ListTile(
@@ -1590,6 +1579,8 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
             ),
             ElevatedButton.icon(
                 onPressed: () async {
+                  if (durationEnabled == false || durationEnabled == null)
+                    options.duration = -1;
                   if (options.multiplayer) {
                     FirebaseFirestore.instance
                         .collection('Rooms')
@@ -1796,7 +1787,9 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                             user, this.user?.email, this.options)));
                   }
                   prefs?.setBool('multiplayer', options.multiplayer);
-                  prefs?.setInt('duration', options.duration);
+                  prefs?.setBool('durationEnabled', options.duration == -1);
+                  prefs?.setInt('duration',
+                      options.duration == -1 ? 60 : options.duration);
                   prefs?.setInt('length', options.length);
                   prefs?.setInt('bestOf', options.bestOf);
                   prefs?.setBool('increasingDiff', options.increasingDiff);
@@ -1855,21 +1848,21 @@ class GamePage extends State<GamePageSend> {
   FocusNode focused = FocusNode();
   int currentDuration = 0, totalDuration = 0, roundCounter = 0;
   List<String>? otherPlayers;
-  bool guessEnabled = true;
-  String hint = '';
+  bool guessEnabled = true, hintAvailable = true;
+  String _lblText = '';
   GamePage(this.user, this.room, this.options);
 
-  Future<List> findPlayers(bool _getStatus) async {
+  Future<List> _getPlayers(bool _getStatus, bool _getSum) async {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     List players = document.get('players');
     if (_getStatus) {
-      List totalScores = await _sumScores(
+      List scores = await _getScores(
           document.get('scores'), document.get('players'), true);
       List statusList = List.empty(growable: true);
       int idx = 0;
-      totalScores.forEach((element) {
+      scores.forEach((element) {
         statusList
             .add({'score': element.values.first, 'player': players[idx++]});
       });
@@ -1883,12 +1876,8 @@ class GamePage extends State<GamePageSend> {
         FirebaseFirestore.instance.collection('Rooms').doc(this.room);
     var document = await docs.get();
     randomNumber = document.get('number');
-    hint = 'guess'.tr().toString() +
-        ' (' +
-        randomNumber.toString().length.toString() +
-        " " +
-        "digit".tr().toLowerCase() +
-        ")";
+    _lblText =
+        randomNumber.toString().length.toString() + ' ' + 'digit'.tr() + ': ';
   }
 
   void processInput() async {
@@ -1897,8 +1886,14 @@ class GamePage extends State<GamePageSend> {
     String rndNumber = randomNumber.toString();
     String tmpEntered = entered.text;
     int dogru = 0, yanlis = 0;
+    String _hint = '';
     for (int i = 0; i < rndNumber.length; i++) {
       if (rndNumber[i] == tmpEntered[i]) {
+        if (!_lblText.split(':').last.contains(rndNumber[i])) {
+          setState(() {
+            hintAvailable = true;
+          });
+        }
         dogru++;
         rndNumber = rndNumber.substring(0, i) + rndNumber.substring(i + 1);
         tmpEntered = tmpEntered.substring(0, i) + tmpEntered.substring(i + 1);
@@ -1965,7 +1960,7 @@ class GamePage extends State<GamePageSend> {
         style: TextStyle(fontSize: 32, color: Colors.green));
   }
 
-  Widget displayResult(List userScore) {
+  Widget displayResults(List userScore) {
     return Center(
       heightFactor: 1,
       child: SingleChildScrollView(
@@ -1995,11 +1990,11 @@ class GamePage extends State<GamePageSend> {
     );
   }
 
-  Future<List> _sumScores(List scores, List players, bool latestOnly) async {
+  Future<List> _getScores(List scores, List players, bool latestOnly) async {
     int idx = 0;
     List userScore = List.empty(growable: true);
     scores.forEach((score) {
-      if (latestOnly) {
+      if (!latestOnly) {
         List roundScores = score.split('-');
         int totalScore = 0;
         roundScores.forEach((element) {
@@ -2015,7 +2010,6 @@ class GamePage extends State<GamePageSend> {
   }
 
   roundEnd() async {
-    print("END");
     setState(() {
       guessEnabled = false;
     });
@@ -2076,7 +2070,11 @@ class GamePage extends State<GamePageSend> {
             });
           });
     else {
-      var userScores = await _sumScores(scores, document.get('players'), false);
+      List userScores =
+          await _getScores(scores, document.get('players'), false);
+      userScores.sort(
+        (a, b) => b.values.first.compareTo(a.values.first),
+      );
       showDialog(
           barrierDismissible: false,
           context: context,
@@ -2087,7 +2085,7 @@ class GamePage extends State<GamePageSend> {
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 25),
                 child: Center(child: displayNumber()),
               ),
-              content: displayResult(userScores),
+              content: displayResults(userScores),
               actions: <Widget>[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -2130,25 +2128,31 @@ class GamePage extends State<GamePageSend> {
     var document = await doc.get();
     if (!document.exists) return;
     bool inserted = false;
-      inserted = document.get('roundInserted');
+    inserted = document.get('roundInserted');
+    var scores = document.get('scores');
     if (!inserted) {
+      roundCounter = scores.first.split('-').length;
       FirebaseFirestore.instance
           .collection("Rooms")
           .doc(this.room)
           .update({'roundInserted': true});
-      var scores = document.get('scores');
       bool increasingDiff = document.get('increasingDiff');
-      roundCounter = scores.first.split('-').length;
       if (increasingDiff) options?.length++;
-      for(int i=0;i<scores.length;i++){
+      for (int i = 0; i < scores.length; i++) {
         scores[i] += '-';
       }
       await FirebaseFirestore.instance
           .collection("Rooms")
           .doc(this.room)
-          .update({'length': options?.length, 'number': findRandom(options?.length), 'scores': scores});
-    } else
+          .update({
+        'length': options?.length,
+        'number': findRandom(options?.length),
+        'scores': scores
+      });
+    } else {
+      roundCounter = scores.first.split('-').length - 1;
       options?.length = document.get('length');
+    }
     initializeNumber();
   }
 
@@ -2158,13 +2162,16 @@ class GamePage extends State<GamePageSend> {
     var document = await doc.get();
     List scores = document.get('scores');
     return scores.every((element) {
-       return element.split('-').length - 1 <= options!.bestOf && element.length > 1 && !element.endsWith('-');});
+      return element.split('-').length - 1 <= options!.bestOf &&
+          element.length > 1 &&
+          !element.endsWith('-');
+    });
   }
 
   void startTimer() async {
     timerSeconds =
         new Timer.periodic(Duration(seconds: 1), (Timer timer) async {
-      if (currentDuration < 1) {
+      if (currentDuration == 0) {
         timer.cancel();
         roundEnd();
       } else {
@@ -2174,7 +2181,7 @@ class GamePage extends State<GamePageSend> {
           roundEnd();
         } else {
           setState(() {
-            currentDuration--;
+            if (currentDuration != -1) currentDuration--;
             totalDuration++;
           });
         }
@@ -2182,10 +2189,18 @@ class GamePage extends State<GamePageSend> {
     });
   }
 
+  void _digitCanBeBought() async {
+    int remaining = await _buyDigit(this.user!.email!, 100, true);
+    setState(() {
+      if (remaining < 0) hintAvailable = false;
+    });
+  }
+
   @override
   void initState() {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       btnApplyColor = Theme.of(context).disabledColor;
+      _digitCanBeBought();
     });
     insertRound();
     currentDuration = options!.duration;
@@ -2249,12 +2264,12 @@ class GamePage extends State<GamePageSend> {
             )));
   }
 
-  Future<int> buyDigit(String email, int bought) async {
+  Future<int> _buyDigit(String email, int bought, bool resultOnly) async {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Users").doc(email);
     var document = await doc.get();
     int transaction = document.get('credit') - bought;
-    if (transaction > -1) {
+    if (!resultOnly && transaction > -1) {
       this.user?.credit = transaction;
       FirebaseFirestore.instance
           .collection("Users")
@@ -2279,47 +2294,58 @@ class GamePage extends State<GamePageSend> {
           title: Text(title),
           actions: [
             IconButton(
-                onPressed: () async {
-                  if (!guessEnabled) return;
-                  int remaining = await buyDigit(this.user!.email!, 100);
-                  if (remaining > -1) {
-                    if (prefs?.get('sound') == 'true') {
-                      AudioCache ac = new AudioCache();
-                      await ac.play('sounds/coin.mp3');
-                      ac.clearAll();
-                    }
-                    String tmpRandom = randomNumber.toString();
-                    bool hinted = false;
-                    String addHint = '';
-                    if (entryList.length > 0) {
-                      for (int i = 0; i < tmpRandom.length; i++) {
-                        if (!hinted && tmpRandom[i] != entryList[0].tahmin[i]) {
-                          addHint += ' ' + tmpRandom[i];
-                          hinted = true;
-                          continue;
+                onPressed: !hintAvailable || entryList.isEmpty
+                    ? null
+                    : () async {
+                        int remaining =
+                            await _buyDigit(this.user!.email!, 100, true);
+                        if (remaining > -1) {
+                          _lblText = randomNumber.toString().length.toString() +
+                              ' ' +
+                              'digit'.tr() +
+                              ': ';
+                          if (prefs?.get('sound') == 'true') {
+                            AudioCache ac = new AudioCache();
+                            await ac.play('sounds/coin.mp3');
+                            ac.clearAll();
+                          }
+                          String tmpRandom = randomNumber.toString();
+                          String _hint = '';
+                          bool hinted = false;
+                          for (int i = 0; i < tmpRandom.length; i++) {
+                            if (!hinted &&
+                                tmpRandom[i] != entryList[0].tahmin[i] &&
+                                !_lblText
+                                    .split(':')
+                                    .last
+                                    .contains(tmpRandom[i])) {
+                              hinted = true;
+                              _hint += tmpRandom[i];
+                              setState(() {
+                                hintAvailable = false;
+                                return;
+                              });
+                            } else {
+                              _hint += ' _';
+                            }
+                          }
+                          if (!hinted) _hint = _hint.split(':').first + ':';
+                          await _buyDigit(this.user!.email!, 100, false);
+                          setState(() {
+                            _lblText += _hint;
+                          });
+                        } else {
+                          setState(() {
+                            hintAvailable = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              new SnackBar(
+                                  content: Text(
+                                      'alertInsufficient'.tr().toString() +
+                                          (-1 * remaining).toString())));
                         }
-                        addHint += ' _';
-                      }
-                    } else {
-                      addHint += tmpRandom[0];
-                      for (int i = 0; i < tmpRandom.length - 1; i++)
-                        addHint += ' _';
-                    }
-                    setState(() {
-                      hint = 'guess'.tr().toString() +
-                          ' (' +
-                          randomNumber.toString().length.toString() +
-                          ") \t" +
-                          addHint;
-                    });
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(new SnackBar(
-                        content: Text('alertInsufficient'.tr().toString() +
-                            (-1 * remaining).toString())));
-                  }
-                },
-                icon: Icon(Icons.money,
-                    size: 30, color: guessEnabled ? Colors.white : Colors.grey))
+                      },
+                icon: Icon(Icons.money))
           ],
         ),
         body: Column(
@@ -2336,7 +2362,7 @@ class GamePage extends State<GamePageSend> {
                             ? SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Container(
-                                  height: 50,
+                                  height: 75,
                                   child: ListView.builder(
                                       scrollDirection: Axis.horizontal,
                                       shrinkWrap: true,
@@ -2348,38 +2374,52 @@ class GamePage extends State<GamePageSend> {
                                             snapshot.data?[idx]['player']);
                                         if (userDecoded['name'] !=
                                             this.user!.name)
-                                          return Padding(
-                                            padding: const EdgeInsets.fromLTRB(
-                                                5, 0, 5, 0),
-                                            child: FittedBox(
-                                                fit: BoxFit.fitHeight,
-                                                child: Column(
-                                                  children: [
-                                                    score == 0
-                                                        ? Container(
-                                                            width: 50,
-                                                            child:
-                                                                LinearProgressIndicator())
-                                                        : Icon(
+                                          return Container(
+                                            width: 75,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      5, 0, 5, 0),
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  score == ''
+                                                      ? Flexible(
+                                                          child:
+                                                              LinearProgressIndicator())
+                                                      : Flexible(
+                                                          child: Icon(
                                                             Icons.done,
                                                             color: Theme.of(
                                                                     context)
                                                                 .primaryColor,
                                                           ),
-                                                    Container(
-                                                        width: 25,
-                                                        height: 25,
+                                                        ),
+                                                  Padding(
+                                                    padding: const EdgeInsets
+                                                        .fromLTRB(0, 8.0, 0, 0),
+                                                    child: Container(
+                                                        width: 30,
+                                                        height: 30,
                                                         child: userDecoded[
-                                                                    'picture'] !=
-                                                                '' && userDecoded['picture'] != null
+                                                                        'picture'] !=
+                                                                    '' &&
+                                                                userDecoded[
+                                                                        'picture'] !=
+                                                                    null
                                                             ? Image.network(
                                                                 userDecoded[
                                                                     'picture'])
                                                             : Image.asset(
                                                                 'assets/imgs/account.png')),
-                                                    Text(userDecoded['name'])
-                                                  ],
-                                                )),
+                                                  ),
+                                                  Flexible(
+                                                      child: Text(
+                                                          userDecoded['name']))
+                                                ],
+                                              ),
+                                            ),
                                           );
                                         return Container();
                                       },
@@ -2388,7 +2428,7 @@ class GamePage extends State<GamePageSend> {
                               )
                             : Container();
                       },
-                      future: findPlayers(true),
+                      future: _getPlayers(true, false),
                     ),
                   ),
                 ],
@@ -2397,13 +2437,15 @@ class GamePage extends State<GamePageSend> {
               padding: const EdgeInsets.fromLTRB(20, 10, 10, 0),
               child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 0, 20, 0),
-                    child: Text(
-                      currentDuration.toString(),
-                      style: TextStyle(fontSize: 24),
-                    ),
-                  ),
+                  currentDuration > 0
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 0, 20, 0),
+                          child: Text(
+                            currentDuration.toString(),
+                            style: TextStyle(fontSize: 24),
+                          ),
+                        )
+                      : Container(),
                   Flexible(
                     child: TextField(
                       maxLength: randomNumber.toString().length,
@@ -2421,7 +2463,7 @@ class GamePage extends State<GamePageSend> {
                       enabled: guessEnabled,
                       textAlign: TextAlign.center,
                       decoration: InputDecoration(
-                          labelText: hint,
+                          label: Text(_lblText, style: TextStyle(fontSize: 20)),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10))),
                       keyboardType: TextInputType.number,
