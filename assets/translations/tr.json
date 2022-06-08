@@ -36,7 +36,7 @@
     "gameList": "Oyunları Listele",
     "joinBtmBtn": "Ara",
     "searchUser": "Kullanıcı Arama",
-    "createBtn": "Oluştur",
+    "create": "Oluştur",
     "multiplayer": "Karşılıklı",
     "update": "Hesabı Güncelle",
     "delete": "Hesabı Sil",
@@ -63,7 +63,7 @@
     "helpScreenTitle3": "Oyun Nasıl Oynanır",
     "helpScreenInfo3": "Oyunun amacı verilen zaman içinde rastgele oluşan numarayı doğru bilmektir.\nTahmin girildikten  sonra, doğru sayı ve doğru yerde olan sayılar (+) ile ve doğru sayı ama yanlış yerde olan sayılar (-) ile alttaki tabloda gözükür.\nSayı doğru tahmin edilirse oyunu kazanırsınız.\nSkorlama alınan zaman, tahmin sayısı ve oyun zorluğu (sayı uzunluğu) ele alınarak yapılır.\nTakıldıysanız, sağ üstten 100 kredi karşılığında bulamadığınız bir sayı size gösterilir.",
     "helpScreenImg3": "assets/imgs/help/trHelp3.png",
-    "timeLimit": "Zaman(sn)",
+    "duration": "Süre",
     "seconds": "saniye",
     "minutes": "dakika",
     "infinite": "Unlimited",
@@ -97,5 +97,9 @@
     "noUser": "Kullanıcı bulunamadı",
     "sentInvite": "Oyun daveti gönderildi",
     "incomingInvite": "Gelen oyun daveti",
-    "showInvite": "Oyun davet isteklerini göster"
+    "showInvite": "Oyun davet isteklerini göster",
+    "revealNumber": "Aranan Rakam",
+    "leagues": "Ligler",
+    "createLeague": "Lig Oluştur",
+    "leagueCreated": "ligi oluşturuldu"
 }

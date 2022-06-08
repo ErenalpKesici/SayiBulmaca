@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="facebook_app_id">729241614991999</string>
-    <string name="facebook_client_token">4a67cc47825a7f9f4333de1c0d222b44</string>
+    <string name="facebook_app_id">731155161433565</string>
+    <string name="facebook_client_token">1d29a446ce7dd9a2791ca0cfcfd7a291</string>
+  <string translatable="false"  name="game_services_project_id"> 385644896752 </string>
 </resources>
+

@@ -26,6 +26,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_signin_button/flutter_signin_button.dart';
 import 'account_settings.dart';
 import 'explore.dart';
+import 'helpers.dart';
+import 'package:intl/intl.dart';
 
 int randomNumber = 0, xpPerLevel = 100, selectedBottomIdx = 0;
 Timer? timerSeconds, timerPlayers;
@@ -424,31 +426,6 @@ class InitialPage extends State<InitialPageSend> {
   }
 }
 
-List<BottomNavigationBarItem> bottomNavItems() {
-  return [
-    BottomNavigationBarItem(
-      icon: Icon(Icons.search),
-      label: 'joinBtmBtn'.tr().toString(),
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.create),
-      label: 'createBtn'.tr().toString(),
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.explore),
-      label: 'explore'.tr().toString(),
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.account_box_rounded),
-      label: 'account'.tr().toString(),
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.settings),
-      label: 'settings'.tr().toString(),
-    ),
-  ];
-}
-
 void navigateBottom(BuildContext context, Users user) {
   switch (selectedBottomIdx) {
     case 0:
@@ -665,45 +642,39 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
               });
           });
           return AlertDialog(
-            title: Center(child: Text("waitingStart".tr().toString())),
-            content: Container(
-              height: 125,
-              child: Column(
-                children: [
-                  Text((playersFound.length != 0
-                          ? (playersFound.length - 1).toString()
-                          : '0') +
-                      'found'.tr().toString()),
-                  SizedBox(
-                    height: 50,
-                  ),
-                  CircularProgressIndicator(),
-                ],
+              title: Center(child: Text("waitingStart".tr().toString())),
+              content: Container(
+                height: 125,
+                child: Column(
+                  children: [
+                    Text((playersFound.length != 0
+                            ? (playersFound.length - 1).toString()
+                            : '0') +
+                        'found'.tr().toString()),
+                    SizedBox(
+                      height: 50,
+                    ),
+                    CircularProgressIndicator(),
+                  ],
+                ),
               ),
-            ),
-            actions: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton(
-                      onPressed: () async {
-                        timerPlayers?.cancel();
-                        var document = await doc.get();
-                        if (document.exists) {
-                          List pls = currentPlayers;
-                          currentPlayers = List.empty(growable: true);
-                          for (int i = 0; i < pls.length - 1; i++)
-                            if (pls[i] != user.email)
-                              currentPlayers.add(pls[i]);
-                          doc.update({'players': currentPlayers});
-                        }
-                        Navigator.pop(context);
-                      },
-                      child: Text('abort'.tr().toString())),
-                ],
-              )
-            ],
-          );
+              actions: [
+                ElevatedButton(
+                    onPressed: () async {
+                      timerPlayers?.cancel();
+                      var document = await doc.get();
+                      if (document.exists) {
+                        List pls = currentPlayers;
+                        currentPlayers = List.empty(growable: true);
+                        for (int i = 0; i < pls.length - 1; i++)
+                          if (pls[i] != user.email) currentPlayers.add(pls[i]);
+                        doc.update({'players': currentPlayers});
+                      }
+                      Navigator.pop(context);
+                    },
+                    child: Text('abort'.tr().toString())),
+              ],
+              actionsAlignment: MainAxisAlignment.center);
         });
       });
 }
@@ -715,29 +686,22 @@ Future<bool> logout(BuildContext context) async {
       title: Center(child: Text('alert'.tr().toString())),
       content: Text('alertLogout'.tr().toString()),
       actions: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              child: Text('no'.tr().toString()),
-              onPressed: () => Navigator.pop(c, false),
-            ),
-            SizedBox(
-              width: 10,
-            ),
-            ElevatedButton(
-              child: Text('yes'.tr().toString()),
-              onPressed: () async {
-                await context.read<AuthenticationServices>().signOut();
-                Navigator.pop(c, false);
-                signedOut = true;
-                Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => InitialPageSend()));
-              },
-            ),
-          ],
+        ElevatedButton(
+          child: Text('no'.tr().toString()),
+          onPressed: () => Navigator.pop(c, false),
+        ),
+        ElevatedButton(
+          child: Text('yes'.tr().toString()),
+          onPressed: () async {
+            await context.read<AuthenticationServices>().signOut();
+            Navigator.pop(c, false);
+            signedOut = true;
+            Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => InitialPageSend()));
+          },
         ),
       ],
+      actionsAlignment: MainAxisAlignment.center,
     ),
   );
   return false;
@@ -986,7 +950,7 @@ class JoinGamePage extends State<JoinGamePageSend> {
                   columns: [
                     DataColumn(label: Text('creator'.tr().toString())),
                     DataColumn(label: Text('playerCount'.tr().toString())),
-                    DataColumn(label: Text('timeLimit'.tr().toString())),
+                    DataColumn(label: Text('duration'.tr().toString())),
                     DataColumn(label: Text('digit'.tr().toString())),
                     DataColumn(label: Text('bestOf'.tr().toString())),
                   ],
@@ -1502,10 +1466,11 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                 });
               },
               title: ListTile(
+                subtitle: Text('(' + 'seconds'.tr() + ')'),
                 enabled: durationEnabled ?? false,
                 leading: Icon(Icons.timelapse),
                 title: Text(
-                  'timeLimit'.tr(),
+                  'duration'.tr(),
                   style: TextStyle(fontSize: 24),
                 ),
                 trailing: DropdownButton<dynamic>(
@@ -1566,6 +1531,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                 ],
               ),
               subtitle: CheckboxListTile(
+                controlAffinity: ListTileControlAffinity.leading,
                 title: Text("increasingDifficulty".tr()),
                 value: options.increasingDiff,
                 onChanged: options.bestOf < 2
@@ -1640,130 +1606,143 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                   ],
                                 ),
                               ),
+                              actionsAlignment: MainAxisAlignment.center,
                               actions: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    ElevatedButton(
-                                        onPressed: () {
-                                          timerPlayers?.cancel();
-                                          FirebaseFirestore.instance
-                                              .collection('Rooms')
-                                              .doc(this.user!.email)
-                                              .delete();
-                                          Navigator.pop(context);
-                                          popInvites();
-                                        },
-                                        child: Text('abort'.tr().toString())),
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.fromLTRB(4, 0, 4, 0),
-                                      child: friends.isEmpty
-                                          ? null
-                                          : ElevatedButton(
-                                              onPressed: () async {
-                                                showDialog(
-                                                    context: context,
-                                                    builder: (context) {
-                                                      return AlertDialog(
-                                                        title: Text(
-                                                          'friends'.tr() +
-                                                              " " +
-                                                              'invite'.tr(),
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                        ),
-                                                        content: SizedBox(
-                                                          height: MediaQuery.of(
-                                                                      context)
+                                ElevatedButton(
+                                    onPressed: () {
+                                      timerPlayers?.cancel();
+                                      FirebaseFirestore.instance
+                                          .collection('Rooms')
+                                          .doc(this.user!.email)
+                                          .delete();
+                                      Navigator.pop(context);
+                                      popInvites();
+                                    },
+                                    child: Text('abort'.tr().toString())),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                                  child: friends.isEmpty
+                                      ? null
+                                      : ElevatedButton(
+                                          onPressed: () async {
+                                            showDialog(
+                                                context: context,
+                                                builder: (context) {
+                                                  return AlertDialog(
+                                                    title: Text(
+                                                      'friends'.tr() +
+                                                          " " +
+                                                          'invite'.tr(),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                    content: SizedBox(
+                                                      height:
+                                                          MediaQuery.of(context)
                                                                   .size
                                                                   .height *
                                                               .3,
-                                                          width: MediaQuery.of(
-                                                                      context)
+                                                      width:
+                                                          MediaQuery.of(context)
                                                                   .size
                                                                   .width *
                                                               .7,
-                                                          child:
-                                                              StatefulBuilder(
-                                                            builder: (BuildContext
-                                                                    context,
-                                                                void Function(
-                                                                        void
-                                                                            Function())
-                                                                    setState) {
-                                                              return ListView
-                                                                  .builder(
-                                                                      shrinkWrap:
-                                                                          true,
-                                                                      itemCount:
-                                                                          friends
-                                                                              .length,
-                                                                      itemBuilder:
-                                                                          (BuildContext context,
-                                                                              int idx) {
-                                                                        return ListTile(
-                                                                          title: Text(friends[idx]
-                                                                              .split('@')
-                                                                              .first),
-                                                                          trailing:
-                                                                              ElevatedButton.icon(
-                                                                            icon:
-                                                                                Icon(Icons.send_outlined),
-                                                                            label:
-                                                                                Text('invite'.tr()),
-                                                                            onPressed:
-                                                                                () async {
-                                                                              List invites = List.empty(growable: true);
-                                                                              DocumentReference docRef = FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
-                                                                              var doc = await docRef.get();
-                                                                              try {
-                                                                                invites = doc.get('invite');
-                                                                              } catch (e) {}
-                                                                              invites.add(user!.email!);
-                                                                              FirebaseFirestore.instance.collection("Users").doc(friends[idx]).update({
-                                                                                'invite': invites
-                                                                              });
-                                                                              setState(() {
-                                                                                invited.add(friends[idx]);
-                                                                              });
-                                                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('sentInvite'.tr() + ': ' + friends[idx])));
-                                                                              Navigator.pop(context);
-                                                                            },
-                                                                          ),
-                                                                        );
-                                                                      });
-                                                            },
-                                                          ),
-                                                        ),
-                                                      );
-                                                    });
-                                              },
-                                              child: Text('invite'.tr())),
-                                    ),
-                                    ElevatedButton(
-                                        onPressed: playersFound.length > 1
-                                            ? () {
-                                                FirebaseFirestore.instance
-                                                    .collection('Rooms')
-                                                    .doc(this.user?.email)
-                                                    .update(
-                                                        {'status': 'playing'});
-                                                Navigator.of(context).push(
-                                                    MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            GamePageSend(
-                                                                user,
-                                                                this
-                                                                    .user
-                                                                    ?.email,
-                                                                options)));
-                                                popInvites();
-                                              }
-                                            : null,
-                                        child: Text('start'.tr().toString()))
-                                  ],
-                                )
+                                                      child: StatefulBuilder(
+                                                        builder: (BuildContext
+                                                                context,
+                                                            void Function(
+                                                                    void
+                                                                        Function())
+                                                                setState) {
+                                                          return ListView
+                                                              .builder(
+                                                                  shrinkWrap:
+                                                                      true,
+                                                                  itemCount:
+                                                                      friends
+                                                                          .length,
+                                                                  itemBuilder:
+                                                                      (BuildContext
+                                                                              context,
+                                                                          int idx) {
+                                                                    return ListTile(
+                                                                      title: Text(friends[
+                                                                              idx]
+                                                                          .split(
+                                                                              '@')
+                                                                          .first),
+                                                                      trailing:
+                                                                          ElevatedButton
+                                                                              .icon(
+                                                                        icon: Icon(
+                                                                            Icons.send_outlined),
+                                                                        label: Text(
+                                                                            'invite'.tr()),
+                                                                        onPressed:
+                                                                            () async {
+                                                                          List
+                                                                              invites =
+                                                                              List.empty(growable: true);
+                                                                          DocumentReference
+                                                                              docRef =
+                                                                              FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
+                                                                          var doc =
+                                                                              await docRef.get();
+                                                                          try {
+                                                                            invites =
+                                                                                doc.get('invite');
+                                                                          } catch (e) {}
+                                                                          invites
+                                                                              .add(user!.email!);
+                                                                          FirebaseFirestore
+                                                                              .instance
+                                                                              .collection(
+                                                                                  "Users")
+                                                                              .doc(friends[
+                                                                                  idx])
+                                                                              .update({
+                                                                            'invite':
+                                                                                invites
+                                                                          });
+                                                                          setState(
+                                                                              () {
+                                                                            invited.add(friends[idx]);
+                                                                          });
+                                                                          ScaffoldMessenger.of(context)
+                                                                              .showSnackBar(SnackBar(content: Text('sentInvite'.tr() + ': ' + friends[idx])));
+                                                                          Navigator.pop(
+                                                                              context);
+                                                                        },
+                                                                      ),
+                                                                    );
+                                                                  });
+                                                        },
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                          },
+                                          child: Text('invite'.tr())),
+                                ),
+                                ElevatedButton(
+                                    onPressed: playersFound.length > 1
+                                        ? () {
+                                            FirebaseFirestore.instance
+                                                .collection('Rooms')
+                                                .doc(this.user?.email)
+                                                .update({'status': 'playing'});
+                                            Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        GamePageSend(
+                                                            user,
+                                                            this.user?.email,
+                                                            options)));
+                                            popInvites();
+                                          }
+                                        : null,
+                                    child: Text('start'.tr().toString()))
                               ],
                             );
                           });
@@ -1787,7 +1766,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                             user, this.user?.email, this.options)));
                   }
                   prefs?.setBool('multiplayer', options.multiplayer);
-                  prefs?.setBool('durationEnabled', options.duration == -1);
+                  prefs?.setBool('durationEnabled', options.duration != -1);
                   prefs?.setInt('duration',
                       options.duration == -1 ? 60 : options.duration);
                   prefs?.setInt('length', options.length);
@@ -1848,7 +1827,7 @@ class GamePage extends State<GamePageSend> {
   FocusNode focused = FocusNode();
   int currentDuration = 0, totalDuration = 0, roundCounter = 0;
   List<String>? otherPlayers;
-  bool guessEnabled = true, hintAvailable = true;
+  bool guessEnabled = true, hintAvailable = true, alertHint = false;
   String _lblText = '';
   GamePage(this.user, this.room, this.options);
 
@@ -1956,8 +1935,13 @@ class GamePage extends State<GamePageSend> {
   }
 
   Widget displayNumber() {
-    return Text(randomNumber.toString(),
-        style: TextStyle(fontSize: 32, color: Colors.green));
+    return Column(
+      children: [
+        Text('revealNumber'.tr()),
+        Text(randomNumber.toString(),
+            style: TextStyle(fontSize: 32, color: Colors.green)),
+      ],
+    );
   }
 
   Widget displayResults(List userScore) {
@@ -2016,40 +2000,36 @@ class GamePage extends State<GamePageSend> {
     DocumentReference doc =
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
-    List players = document.get('players');
     List scores = document.get('scores');
-    // for(int i=0;i<scores.length;i++){
-    //   if(!scores[i].endsWith('-'))
-    //   scores[i] += '-';
-    // }
-    // scores[players.indexWhere(
-    //     (element) => jsonDecode(element)['email'] == this.user!.email!)] += '-';
     FirebaseFirestore.instance
         .collection("Rooms")
         .doc(this.room!)
         .update({'scores': scores});
     int cd = 3;
-    if (this.options!.bestOf >= scores.first.split('-').length)
+    if (this.options!.bestOf >= scores.first.split('-').length) {
+      bool _cdStarted = false;
       showDialog(
           context: context,
           barrierDismissible: false,
           builder: (BuildContext context) {
             return StatefulBuilder(builder: (context, setState) {
-              if (cd != 0)
+              if (!_cdStarted && cd != 0) {
                 Timer.periodic(new Duration(seconds: 1), (timer) {
-                  if (cd == 0) {
+                  _cdStarted = true;
+                  if (cd < 1) {
+                    _cdStarted = false;
                     timer.cancel();
                     cd = -1;
                     Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) =>
                             GamePageSend(user, this.room, this.options)));
-                  } else if (cd < 0)
-                    timer.cancel();
-                  else
+                  } else
                     setState(() {
                       cd--;
+                      print(cd);
                     });
                 });
+              }
               return AlertDialog(
                 title: Center(
                   child: displayNumber(),
@@ -2069,7 +2049,7 @@ class GamePage extends State<GamePageSend> {
               );
             });
           });
-    else {
+    } else {
       List userScores =
           await _getScores(scores, document.get('players'), false);
       userScores.sort(
@@ -2239,28 +2219,21 @@ class GamePage extends State<GamePageSend> {
         builder: (context) => new AlertDialog(
               title: Text("alertLeave".tr().toString()),
               actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton(
-                      child: Text('no'.tr().toString()),
-                      onPressed: () => Navigator.pop(context, false),
-                    ),
-                    SizedBox(
-                      width: 10,
-                    ),
-                    ElevatedButton(
-                      child: Text('yes'.tr().toString()),
-                      onPressed: () async {
-                        timerSeconds?.cancel();
-                        leaveGame();
-                        Navigator.pop(context, true);
-                        toMainPage(context, user!);
-                      },
-                    ),
-                  ],
+                ElevatedButton(
+                  child: Text('no'.tr().toString()),
+                  onPressed: () => Navigator.pop(context, false),
+                ),
+                ElevatedButton(
+                  child: Text('yes'.tr().toString()),
+                  onPressed: () async {
+                    timerSeconds?.cancel();
+                    leaveGame();
+                    Navigator.pop(context, true);
+                    toMainPage(context, user!);
+                  },
                 ),
               ],
+              actionsAlignment: MainAxisAlignment.center,
             )));
   }
 
@@ -2333,6 +2306,7 @@ class GamePage extends State<GamePageSend> {
                           await _buyDigit(this.user!.email!, 100, false);
                           setState(() {
                             _lblText += _hint;
+                            alertHint = true;
                           });
                         } else {
                           setState(() {
@@ -2463,7 +2437,28 @@ class GamePage extends State<GamePageSend> {
                       enabled: guessEnabled,
                       textAlign: TextAlign.center,
                       decoration: InputDecoration(
-                          label: Text(_lblText, style: TextStyle(fontSize: 20)),
+                          label: AnimatedDefaultTextStyle(
+                            onEnd: () {
+                              setState(() {
+                                alertHint = false;
+                              });
+                            },
+                            duration: Duration(seconds: 1),
+                            style: alertHint
+                                ? TextStyle(
+                                    color: Theme.of(context)
+                                        .appBarTheme
+                                        .backgroundColor,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold)
+                                : TextStyle(
+                                    color: Theme.of(context)
+                                        .appBarTheme
+                                        .backgroundColor,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.normal),
+                            child: Text(_lblText),
+                          ),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10))),
                       keyboardType: TextInputType.number,

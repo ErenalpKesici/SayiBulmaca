@@ -60,75 +60,66 @@ class AccountSettingsPage extends State<AccountSettingsPageSend> {
                               textAlign: TextAlign.center,
                             ),
                             actions: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  ElevatedButton(
-                                    child: Text('no'.tr().toString()),
-                                    onPressed: () => Navigator.pop(c, false),
-                                  ),
-                                  SizedBox(
-                                    width: 20,
-                                  ),
-                                  ElevatedButton(
-                                      child: Text('yes'.tr().toString()),
-                                      onPressed: () async {
-                                        await context
-                                            .read<AuthenticationServices>()
-                                            .signIn(
-                                                email: this.user!.email,
-                                                password: this.user!.password);
-                                        await FirebaseFirestore.instance
-                                            .collection("Users")
-                                            .get()
-                                            .then((value) {
-                                          value.docs.forEach((result) async {
-                                            List friends =
-                                                List.empty(growable: true);
-                                            List requests =
-                                                List.empty(growable: true);
-                                            try {
-                                              friends = result.get('friends');
-                                              friends.removeWhere((element) =>
-                                                  element == user!.email!);
-                                              requests = result.get('requests');
-                                              requests.removeWhere((element) =>
-                                                  element == user!.email!);
-                                              await FirebaseFirestore.instance
-                                                  .collection("Users")
-                                                  .doc(result.get('email'))
-                                                  .update({
-                                                'friends': friends,
-                                                'requests': requests
-                                              });
-                                            } catch (e) {}
-                                          });
-                                        });
-                                        await FirebaseFirestore.instance
-                                            .collection('Users')
-                                            .doc(this.user!.email)
-                                            .delete();
-                                        if (this.user!.method == 'email')
-                                          await context
-                                              .read<AuthenticationServices>()
-                                              .delete(
-                                                  email: this.user!.email,
-                                                  password:
-                                                      this.user!.password);
-                                        else
-                                          await context
-                                              .read<AuthenticationServices>()
-                                              .deleteProvider(
-                                                  this.user!.method!);
-                                        signedOut = true;
-                                        Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    InitialPageSend()));
-                                      }),
-                                ],
+                              ElevatedButton(
+                                child: Text('no'.tr().toString()),
+                                onPressed: () => Navigator.pop(c, false),
                               ),
+                              ElevatedButton(
+                                  child: Text('yes'.tr().toString()),
+                                  onPressed: () async {
+                                    await context
+                                        .read<AuthenticationServices>()
+                                        .signIn(
+                                            email: this.user!.email,
+                                            password: this.user!.password);
+                                    await FirebaseFirestore.instance
+                                        .collection("Users")
+                                        .get()
+                                        .then((value) {
+                                      value.docs.forEach((result) async {
+                                        List friends =
+                                            List.empty(growable: true);
+                                        List requests =
+                                            List.empty(growable: true);
+                                        try {
+                                          friends = result.get('friends');
+                                          friends.removeWhere((element) =>
+                                              element == user!.email!);
+                                          requests = result.get('requests');
+                                          requests.removeWhere((element) =>
+                                              element == user!.email!);
+                                          await FirebaseFirestore.instance
+                                              .collection("Users")
+                                              .doc(result.get('email'))
+                                              .update({
+                                            'friends': friends,
+                                            'requests': requests
+                                          });
+                                        } catch (e) {}
+                                      });
+                                    });
+                                    await FirebaseFirestore.instance
+                                        .collection('Users')
+                                        .doc(this.user!.email)
+                                        .delete();
+                                    if (this.user!.method == 'email')
+                                      await context
+                                          .read<AuthenticationServices>()
+                                          .delete(
+                                              email: this.user!.email,
+                                              password: this.user!.password);
+                                    else
+                                      await context
+                                          .read<AuthenticationServices>()
+                                          .deleteProvider(this.user!.method!);
+                                    signedOut = true;
+                                    Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                InitialPageSend()));
+                                  }),
                             ],
+                            actionsAlignment: MainAxisAlignment.center,
                           ));
                 },
                 icon: Icon(Icons.delete),
