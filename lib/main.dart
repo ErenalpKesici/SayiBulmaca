@@ -54,7 +54,7 @@ Future<Users> findUser(email) async {
 
 void toMainPage(BuildContext context, Users user) {
   selectedBottomIdx = 0;
-  Navigator.of(context).push(
+  Navigator.maybeOf(context)?.push(
       MaterialPageRoute(builder: (context) => SearchPageSend(user: user)));
 }
 
@@ -343,7 +343,6 @@ class InitialPage extends State<InitialPageSend> {
                     xp: 0,
                     credit: 0,
                     method: 'google');
-                toMainPage(context, user);
               }
             }),
             SignInButton(
@@ -547,6 +546,7 @@ class RegisterPage extends State<RegisterPageSend> {
                       'email': email.text,
                       'name': name.text,
                       'password': password.text,
+                      'picture': '',
                       'status': 0,
                       'xp': 0,
                       'credit': 0,
@@ -556,6 +556,7 @@ class RegisterPage extends State<RegisterPageSend> {
                     Users user = new Users(
                         email: email.text,
                         password: password.text,
+                        picture: '',
                         name: name.text,
                         language: selectedLanguage,
                         xp: 0,
@@ -949,7 +950,7 @@ class JoinGamePage extends State<JoinGamePageSend> {
                   showCheckboxColumn: false,
                   columns: [
                     DataColumn(label: Text('creator'.tr().toString())),
-                    DataColumn(label: Text('playerCount'.tr().toString())),
+                    DataColumn(label: Text('players'.tr().toString())),
                     DataColumn(label: Text('duration'.tr().toString())),
                     DataColumn(label: Text('digit'.tr().toString())),
                     DataColumn(label: Text('bestOf'.tr().toString())),
@@ -1742,7 +1743,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                                             popInvites();
                                           }
                                         : null,
-                                    child: Text('start'.tr().toString()))
+                                    child: Text('startGame'.tr().toString()))
                               ],
                             );
                           });
@@ -1775,7 +1776,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                 },
                 style: ElevatedButton.styleFrom(padding: EdgeInsets.all(32)),
                 icon: Icon(Icons.play_circle),
-                label: Text('start'.tr().toString(),
+                label: Text('startGame'.tr().toString(),
                     style: TextStyle(fontSize: 30)))
           ],
         ),
@@ -2044,7 +2045,7 @@ class GamePage extends State<GamePageSend> {
                 //         Navigator.pop(context);
                 //         toMainPage(context, this.user!);
                 //       },
-                //       child: Center(child: Text("leave".tr().toString()))),
+                //       child: Center(child: Text("leaveGame".tr().toString()))),
                 // ],
               );
             });
@@ -2089,7 +2090,8 @@ class GamePage extends State<GamePageSend> {
                             leaveGame();
                           toMainPage(context, user!);
                         },
-                        child: Center(child: Text("leave".tr().toString()))),
+                        child:
+                            Center(child: Text("leaveGame".tr().toString()))),
                   ],
                 )
               ],
@@ -2217,7 +2219,7 @@ class GamePage extends State<GamePageSend> {
     return (await showDialog(
         context: context,
         builder: (context) => new AlertDialog(
-              title: Text("alertLeave".tr().toString()),
+              title: Text("alertleaveGame".tr().toString()),
               actions: [
                 ElevatedButton(
                   child: Text('no'.tr().toString()),

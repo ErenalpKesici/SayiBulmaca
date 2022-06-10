@@ -1,14 +1,13 @@
 import 'package:sayibulmaca/Options.dart';
 
-class League {
-  String? id, name = '', host = '', picture = '';
+class Championship {
+  String? id, name = '', host = '';
   List players = List.empty(growable: true);
   Options? options;
-  League(
+  Championship(
       {required this.id,
       required this.name,
       required this.host,
       required this.players,
-      required this.options,
-      this.picture});
+      required this.options});
 }

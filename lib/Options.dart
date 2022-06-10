@@ -10,17 +10,19 @@ class Options {
       required this.bestOf,
       required this.increasingDiff,
       required length});
-  @override
-  String toString() {
-    return game +
-        '; multiplayer: ' +
-        multiplayer.toString() +
-        ' duration: ' +
-        duration.toString() +
-        ' best: ' +
-        bestOf.toString() +
-        ' digit: ' +
-        'inc: ' +
-        this.increasingDiff.toString();
-  }
+  Options.fromJson(Map<String, dynamic> json)
+      : game = json['game'],
+        multiplayer = json['multiplayer'],
+        duration = json['duration'],
+        bestOf = json['bestOf'],
+        increasingDiff = json['increasingDiff'],
+        length = json['length'];
+  Map<String, dynamic> toJson() => {
+        'game': game,
+        'multiplayer': multiplayer,
+        'duration': duration,
+        'bestOf': bestOf,
+        'increasingDiff': increasingDiff,
+        'length': length
+      };
 }

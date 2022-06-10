@@ -53,10 +53,10 @@ class AccountSettingsPage extends State<AccountSettingsPageSend> {
                   return await showDialog(
                       context: context,
                       builder: (c) => AlertDialog(
-                            title:
-                                Center(child: Text("delete".tr().toString())),
+                            title: Center(
+                                child: Text("deleteAccount".tr().toString())),
                             content: Text(
-                              'alertDelete'.tr().toString(),
+                              'alertDeleteAccount'.tr().toString(),
                               textAlign: TextAlign.center,
                             ),
                             actions: [
