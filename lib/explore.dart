@@ -2,23 +2,58 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:sayibulmaca/Options.dart';
+import 'package:sayibulmaca/championship_details.dart';
 
 import 'AuthenticationServices.dart';
 import 'Users.dart';
 import 'helpers.dart';
-import 'league.dart';
+import 'championship.dart';
 import 'main.dart';
 import 'package:badges/badges.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 List myRequests = List.empty(growable: true);
 List myFriends = List.empty(growable: true);
+List joinedChampionships = List.empty(growable: true);
+Future<List> loadChampionships(Users user, int currentPage) async {
+  if (currentPage != 2) return List.empty();
+  List<Championship> championships = List.empty(growable: true);
+  try {
+    await FirebaseFirestore.instance
+        .collection("Championships")
+        .get()
+        .then((value) {
+      value.docs.forEach((element) {
+        Options options = Options(
+            game: 'guess',
+            multiplayer: true,
+            duration: element.get('duration'),
+            bestOf: element.get('bestOf'),
+            increasingDiff: element.get('increasingDiff'),
+            length: element.get('length'));
+        championships.add(Championship(
+            id: element.id,
+            name: element.get('name'),
+            host: element.get('host'),
+            players: element.get('players'),
+            options: options));
+        if (element.get('players').contains(jsonEncode(user)))
+          joinedChampionships.add(element.id);
+      });
+    });
+    print(joinedChampionships);
+  } catch (e) {
+    return List.empty();
+  }
+  return championships;
+}
 
 class ExplorePageSend extends StatefulWidget {
   final Users? user;
@@ -39,9 +74,9 @@ class ExplorePage extends State<ExplorePageSend> {
   TextEditingController tecName = TextEditingController();
   TextEditingController tecOptions = TextEditingController();
   TextEditingController tecEndDate = TextEditingController();
-
-  int optionsLength = 3, optionsDuration = 30, optionsRound = 1;
-  bool optionsDurationEnabled = false, optionsIncreasingDiff = false;
+  Options? options;
+  // int optionsLength = 3, optionsDuration = 30, optionsRound = 1;
+  // bool optionsDurationEnabled = false, optionsIncreasingDiff = false;
 
   Future<int> getXp() async {
     DocumentReference docUser =
@@ -74,29 +109,6 @@ class ExplorePage extends State<ExplorePageSend> {
     } catch (e) {
       print(e);
     }
-  }
-
-  Future<List> loadLeagues() async {
-    List<League> leagues = List.empty(growable: true);
-    await FirebaseFirestore.instance.collection("Leagues").get().then((value) {
-      value.docs.forEach((element) {
-        Options options = Options(
-            game: 'guess',
-            multiplayer: true,
-            duration: element.get('duration'),
-            bestOf: element.get('bestOf'),
-            increasingDiff: element.get('increasingDiff'),
-            length: element.get('length'));
-        leagues.add(League(
-            id: element.id,
-            name: element.get('name'),
-            host: element.get('host'),
-            players: List.filled(
-                element.get('players').length, element.get('players')),
-            options: options));
-      });
-    });
-    return leagues;
   }
 
   @override
@@ -145,6 +157,89 @@ class ExplorePage extends State<ExplorePageSend> {
     });
   }
 
+  Widget _getTile(snapshot, index) {
+    return Container(
+      width: MediaQuery.of(context).size.width * .5,
+      child: Padding(
+        padding: const EdgeInsets.all(2.0),
+        child: Card(
+          elevation: 1,
+          child: ListTile(
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => ChampionshipDetailsPageSend(
+                        championship: snapshot.data[index],
+                        user: this.user,
+                      )));
+            },
+            tileColor: Theme.of(context).cardColor,
+            title: Text(snapshot.data[index].name),
+            trailing: snapshot.data[index].host == this.user!.email
+                ? ElevatedButton.icon(
+                    onPressed: () async {
+                      showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                                actionsAlignment: MainAxisAlignment.center,
+                                title: Text('alertDeleteChampionship'.tr()),
+                                actions: [
+                                  ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                      },
+                                      child: Text('no'.tr())),
+                                  ElevatedButton(
+                                      onPressed: () async {
+                                        await FirebaseFirestore.instance
+                                            .collection("Championships")
+                                            .doc(snapshot.data[index].id)
+                                            .delete();
+                                        Navigator.pop(context);
+                                        setState(() {});
+                                      },
+                                      child: Text('yes'.tr())),
+                                ],
+                              ));
+                    },
+                    icon: Icon(Icons.delete),
+                    label: Text('delete'.tr()))
+                : joinedChampionships.contains(snapshot.data[index].id)
+                    ? ElevatedButton.icon(
+                        onPressed: () async {
+                          await removeFrom(this.user!.email, 'Championships',
+                              snapshot.data[index].id, 'players');
+                          setState(() {
+                            joinedChampionships.removeWhere((element) =>
+                                element == snapshot.data[index].id);
+                          });
+                        },
+                        icon: Icon(Icons.exit_to_app),
+                        label: Text('leave'.tr()))
+                    : ElevatedButton.icon(
+                        onPressed: () async {
+                          DocumentReference documentReference =
+                              FirebaseFirestore.instance
+                                  .collection("Championships")
+                                  .doc(snapshot.data[index].id);
+                          var doc = await documentReference.get();
+                          List players = doc.get('players');
+                          players.add(jsonEncode(this.user));
+                          FirebaseFirestore.instance
+                              .collection("Championships")
+                              .doc(snapshot.data[index].id)
+                              .update({'players': players});
+                          setState(() {
+                            joinedChampionships.add(snapshot.data[index].id);
+                          });
+                        },
+                        icon: Icon(Icons.start),
+                        label: Text('join'.tr())),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -187,7 +282,7 @@ class ExplorePage extends State<ExplorePageSend> {
                 ),
                 Tab(
                   icon: Icon(Icons.show_chart),
-                  text: 'leagues'.tr(),
+                  text: 'championship'.tr(),
                 ),
               ],
             ),
@@ -448,51 +543,13 @@ class ExplorePage extends State<ExplorePageSend> {
                       );
                     }),
             FutureBuilder(
-              future: loadLeagues(),
+              future: loadChampionships(this.user!, currentPage),
               builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
                 if (snapshot.hasData && snapshot.data.isNotEmpty)
                   return ListView.builder(
                     itemCount: snapshot.data.length,
                     itemBuilder: (BuildContext context, int index) {
-                      bool _unique = false;
-                      snapshot.data[index].players.forEach((element) {
-                        print(element.length);
-                        // jsonDecode(element).foreach((value) {
-                        //   if (jsonDecode(value).email == this.user!.email) {
-                        //     _unique = false;
-                        //     return;
-                        //   }
-                        // });
-                      });
-                      if (_unique)
-                        return Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Card(
-                            elevation: 1,
-                            child: ListTile(
-                              tileColor: Theme.of(context).cardColor,
-                              title: Text(snapshot.data[index].name),
-                              subtitle: Text(snapshot.data[index].host),
-                              trailing: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    DocumentReference documentReference =
-                                        FirebaseFirestore.instance
-                                            .collection("Leagues")
-                                            .doc(snapshot.data[index].id);
-                                    var doc = await documentReference.get();
-                                    List players = doc.get('players');
-                                    players.add(jsonEncode(this.user));
-                                    FirebaseFirestore.instance
-                                        .collection("Leagues")
-                                        .doc(snapshot.data[index].id)
-                                        .update({'players': players});
-                                  },
-                                  icon: Icon(Icons.start),
-                                  label: Text('join'.tr())),
-                            ),
-                          ),
-                        );
-                      return Container();
+                      return _getTile(snapshot, index);
                     },
                   );
                 else
@@ -502,7 +559,7 @@ class ExplorePage extends State<ExplorePageSend> {
           ]),
           floatingActionButton: currentPage == 2
               ? FloatingActionButton.extended(
-                  label: Text('createLeague'.tr()),
+                  label: Text('createChampionship'.tr()),
                   icon: Icon(Icons.add),
                   onPressed: () async {
                     DateTime? date;
@@ -513,7 +570,7 @@ class ExplorePage extends State<ExplorePageSend> {
                           return AlertDialog(
                             actionsAlignment: MainAxisAlignment.center,
                             title: Text(
-                              'createLeague'.tr(),
+                              'createChampionship'.tr(),
                               textAlign: TextAlign.center,
                             ),
                             content: SingleChildScrollView(
@@ -552,214 +609,12 @@ class ExplorePage extends State<ExplorePageSend> {
                                                 BorderRadius.circular(10))),
                                   ),
                                   ElevatedButton.icon(
-                                    icon: Icon(Icons.settings),
-                                    label: Text('settings'.tr()),
-                                    onPressed: () {
-                                      showDialog(
-                                          context: context,
-                                          builder: (context) {
-                                            var durationEnabled;
-                                            return StatefulBuilder(
-                                              builder: (BuildContext context,
-                                                  void Function(void Function())
-                                                      setState) {
-                                                return AlertDialog(
-                                                  title: Text('settings'.tr()),
-                                                  content: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .spaceAround,
-                                                    children: [
-                                                      ListTile(
-                                                        title: Text(
-                                                          'digitLength'
-                                                              .tr()
-                                                              .toString(),
-                                                        ),
-                                                        trailing:
-                                                            DropdownButton<int>(
-                                                          value: optionsLength,
-                                                          items: [
-                                                            3,
-                                                            4,
-                                                            5,
-                                                            6,
-                                                            7,
-                                                            8,
-                                                            9
-                                                          ].map<
-                                                              DropdownMenuItem<
-                                                                  int>>((int
-                                                              value) {
-                                                            return DropdownMenuItem<
-                                                                int>(
-                                                              value: value,
-                                                              child: Text(
-                                                                value
-                                                                    .toString(),
-                                                              ),
-                                                            );
-                                                          }).toList(),
-                                                          onChanged:
-                                                              (int? value) {
-                                                            setState(() {
-                                                              optionsLength =
-                                                                  value!;
-                                                            });
-                                                          },
-                                                        ),
-                                                      ),
-                                                      CheckboxListTile(
-                                                        value:
-                                                            durationEnabled ??
-                                                                false,
-                                                        onChanged:
-                                                            (bool? active) {
-                                                          setState(() {
-                                                            durationEnabled =
-                                                                active!;
-                                                            print(
-                                                                durationEnabled);
-                                                          });
-                                                        },
-                                                        title: ListTile(
-                                                          subtitle: Text('(' +
-                                                              'seconds'.tr() +
-                                                              ')'),
-                                                          enabled:
-                                                              durationEnabled ??
-                                                                  false,
-                                                          title: Text(
-                                                            'duration'.tr(),
-                                                          ),
-                                                          trailing:
-                                                              DropdownButton<
-                                                                  dynamic>(
-                                                            value: optionsDuration ==
-                                                                    -1
-                                                                ? 15
-                                                                : optionsDuration,
-                                                            items: [
-                                                              15,
-                                                              30,
-                                                              45,
-                                                              60,
-                                                              120
-                                                            ].map<
-                                                                DropdownMenuItem<
-                                                                    int>>((int
-                                                                value) {
-                                                              return DropdownMenuItem<
-                                                                  int>(
-                                                                value: value,
-                                                                child: Text(
-                                                                  value
-                                                                      .toString(),
-                                                                ),
-                                                              );
-                                                            }).toList(),
-                                                            onChanged: durationEnabled ==
-                                                                        null ||
-                                                                    durationEnabled ==
-                                                                        false
-                                                                ? null
-                                                                : (value) {
-                                                                    print(
-                                                                        value);
-                                                                    setState(
-                                                                        () {
-                                                                      optionsDuration =
-                                                                          value!;
-                                                                    });
-                                                                  },
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      ListTile(
-                                                        title: Row(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .spaceBetween,
-                                                          children: [
-                                                            Text(
-                                                              'bestOf'
-                                                                  .tr()
-                                                                  .toString(),
-                                                            ),
-                                                            DropdownButton<int>(
-                                                              value:
-                                                                  optionsRound,
-                                                              items: [
-                                                                1,
-                                                                3,
-                                                                5
-                                                              ].map<
-                                                                  DropdownMenuItem<
-                                                                      int>>((int
-                                                                  value) {
-                                                                return DropdownMenuItem<
-                                                                    int>(
-                                                                  value: value,
-                                                                  child: Text(
-                                                                    value
-                                                                        .toString(),
-                                                                  ),
-                                                                );
-                                                              }).toList(),
-                                                              onChanged:
-                                                                  (int? value) {
-                                                                setState(() {
-                                                                  if (value ==
-                                                                      1) {
-                                                                    optionsIncreasingDiff =
-                                                                        false;
-                                                                  }
-                                                                  optionsRound =
-                                                                      value!;
-                                                                });
-                                                              },
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        subtitle:
-                                                            CheckboxListTile(
-                                                          controlAffinity:
-                                                              ListTileControlAffinity
-                                                                  .leading,
-                                                          title: Text(
-                                                              "increasingDifficulty"
-                                                                  .tr()),
-                                                          value:
-                                                              optionsIncreasingDiff,
-                                                          onChanged:
-                                                              optionsRound < 2
-                                                                  ? null
-                                                                  : (value) {
-                                                                      setState(
-                                                                          () {
-                                                                        optionsIncreasingDiff =
-                                                                            value!;
-                                                                      });
-                                                                    },
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  actions: [
-                                                    ElevatedButton(
-                                                        onPressed: () {
-                                                          Navigator.pop(
-                                                              context);
-                                                        },
-                                                        child:
-                                                            Text('next'.tr()))
-                                                  ],
-                                                );
-                                              },
-                                            );
-                                          });
-                                    },
-                                  ),
+                                      icon: Icon(Icons.settings),
+                                      label: Text('settings'.tr()),
+                                      onPressed: () async {
+                                        options = await popupOptions(
+                                            context, options);
+                                      }),
                                 ],
                               ),
                             ),
@@ -773,24 +628,25 @@ class ExplorePage extends State<ExplorePageSend> {
                                   onPressed: () async {
                                     if (tecName.text != '') {
                                       await FirebaseFirestore.instance
-                                          .collection('Leagues')
+                                          .collection('Championships')
                                           .doc()
                                           .set({
                                         'name': tecName.text,
                                         'host': this.user?.email,
                                         'players': List.filled(
                                             1, jsonEncode(this.user)),
-                                        'length': optionsLength,
-                                        'duration': optionsDuration,
+                                        'length': options?.length,
+                                        'duration': options?.duration,
                                         'endDate': tecEndDate.text,
-                                        'bestOf': optionsRound,
-                                        'increasingDiff': optionsIncreasingDiff
+                                        'bestOf': options?.bestOf,
+                                        'increasingDiff':
+                                            options?.increasingDiff
                                       });
                                       ScaffoldMessenger.maybeOf(context)
                                           ?.showSnackBar(SnackBar(
                                               content: Text(tecName.text +
                                                   ' ' +
-                                                  'leagueCreated'.tr())));
+                                                  'championshipCreated'.tr())));
                                       Navigator.pop(context);
                                     } else
                                       ScaffoldMessenger.maybeOf(context)
