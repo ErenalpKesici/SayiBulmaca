@@ -123,7 +123,7 @@ class AccountSettingsPage extends State<AccountSettingsPageSend> {
                           ));
                 },
                 icon: Icon(Icons.delete),
-                label: Text('delete'.tr().toString(),
+                label: Text('deleteAccount'.tr().toString(),
                     style: TextStyle(fontSize: 30))),
           ),
         ]),

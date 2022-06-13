@@ -29,6 +29,10 @@ import 'explore.dart';
 import 'helpers.dart';
 import 'package:intl/intl.dart';
 
+import 'league.dart';
+import 'league_page.dart';
+import 'matchup.dart';
+
 int randomNumber = 0, xpPerLevel = 100, selectedBottomIdx = 0;
 Timer? timerSeconds, timerPlayers;
 GetStorage introShown = GetStorage();
@@ -721,17 +725,55 @@ class SearchPage extends State<SearchPageSend> {
   Users? user;
   Timer? searchTimer;
   int selectedIdx = 0;
+  Matchup? matchup;
   SearchPage(this.user);
   @override
   void initState() {
     checkNetwork(context);
     scanInvites(this.user, context);
     super.initState();
-    print(user!);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (EasyLocalization.of(context)!.locale != Locale(this.user!.language!))
         EasyLocalization.of(context)!.setLocale(Locale(this.user!.language!));
     });
+  }
+
+  Future searchLeagueStarted() async {
+    var ret;
+    try {
+      await FirebaseFirestore.instance
+          .collection('Leagues')
+          .get()
+          .then((value) => value.docs.forEach((element) {
+                jsonDecode(element.get('matchups')).forEach((match) {
+                  List players = match['players'];
+                  if (players.any((element) =>
+                      jsonDecode(element)['email'] == this.user!.email)) {
+                    var league = element.data();
+                    ret = {
+                      'league': League(
+                          host: league['host'],
+                          id: element.id,
+                          name: league['name'],
+                          options: Options(
+                              bestOf: league['bestOf'],
+                              duration: league['duration'],
+                              game: '',
+                              increasingDiff: league['increasingDiff'],
+                              length: league['length'],
+                              multiplayer: true),
+                          players: league['players'],
+                          matchups: jsonDecode(league['matchups'])),
+                      'matchup': Matchup(
+                          players: match['players'], scores: match['scores'])
+                    };
+                  }
+                });
+              }));
+    } catch (e) {
+      print(e);
+    }
+    return ret;
   }
 
   @override
@@ -839,7 +881,7 @@ class SearchPage extends State<SearchPageSend> {
                         style: TextStyle(fontSize: 30))),
               ),
               SizedBox(
-                height: 25,
+                height: MediaQuery.of(context).size.height * .1,
               ),
               ElevatedButton.icon(
                   onPressed: () async {
@@ -852,9 +894,32 @@ class SearchPage extends State<SearchPageSend> {
                   icon: Icon(Icons.list),
                   label: Text('gameList'.tr().toString(),
                       style: TextStyle(fontSize: 30))),
-              SizedBox(
-                height: 25,
-              ),
+              FutureBuilder(
+                  future: searchLeagueStarted(),
+                  builder:
+                      (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+                    if (snapshot.hasData)
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * .1,
+                          ),
+                          ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(MaterialPageRoute(
+                                    builder: (context) => LeaguePageSend(
+                                        user: this.user,
+                                        league: snapshot.data['league'])));
+                              },
+                              style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.all(16)),
+                              icon: Icon(Icons.leaderboard),
+                              label: Text('leagueStarted'.tr(),
+                                  style: TextStyle(fontSize: 30))),
+                        ],
+                      );
+                    return SizedBox.shrink();
+                  })
             ],
           ),
         ),
@@ -1019,7 +1084,6 @@ class AccountPage extends State<AccountPageSend> {
 
   @override
   void initState() {
-    print(user);
     super.initState();
   }
 
@@ -2217,26 +2281,27 @@ class GamePage extends State<GamePageSend> {
 
   Future<bool> onWillPop(BuildContext c) async {
     return (await showDialog(
-        context: context,
-        builder: (context) => new AlertDialog(
-              title: Text("alertleaveGame".tr().toString()),
-              actions: [
-                ElevatedButton(
-                  child: Text('no'.tr().toString()),
-                  onPressed: () => Navigator.pop(context, false),
-                ),
-                ElevatedButton(
-                  child: Text('yes'.tr().toString()),
-                  onPressed: () async {
-                    timerSeconds?.cancel();
-                    leaveGame();
-                    Navigator.pop(context, true);
-                    toMainPage(context, user!);
-                  },
-                ),
-              ],
-              actionsAlignment: MainAxisAlignment.center,
-            )));
+            context: context,
+            builder: (context) => new AlertDialog(
+                  title: Text("alertleaveGame".tr()),
+                  actions: [
+                    ElevatedButton(
+                      child: Text('no'.tr().toString()),
+                      onPressed: () => Navigator.pop(context, false),
+                    ),
+                    ElevatedButton(
+                      child: Text('yes'.tr().toString()),
+                      onPressed: () async {
+                        timerSeconds?.cancel();
+                        leaveGame();
+                        Navigator.pop(context, true);
+                        toMainPage(context, user!);
+                      },
+                    ),
+                  ],
+                  actionsAlignment: MainAxisAlignment.center,
+                )) ??
+        false);
   }
 
   Future<int> _buyDigit(String email, int bought, bool resultOnly) async {

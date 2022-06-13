@@ -31,10 +31,8 @@ List<BottomNavigationBarItem> bottomNavItems() {
   ];
 }
 
-Future<Options?> popupOptions(
-    BuildContext context, Options? paramOptions) async {
-  Options options = paramOptions ?? Options.empty();
-  print(jsonEncode(options));
+Future<Options> popupOptions(
+    BuildContext context, Options options, String idIfExists) async {
   showDialog(
       context: context,
       builder: (context) {
@@ -152,7 +150,19 @@ Future<Options?> popupOptions(
               ),
               actions: [
                 ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      if (idIfExists != '') {
+                        await FirebaseFirestore.instance
+                            .collection('Leagues')
+                            .doc(idIfExists)
+                            .update({
+                          'length': options.length,
+                          'duration': options.duration,
+                          // 'endDate': tecEndDate.text,
+                          'bestOf': options.bestOf,
+                          'increasingDiff': options.increasingDiff
+                        });
+                      }
                       Navigator.pop(context);
                     },
                     child: Text('next'.tr()))
@@ -161,7 +171,14 @@ Future<Options?> popupOptions(
           },
         );
       });
-  return options == Options.empty() ? paramOptions : options;
+  return options;
+}
+
+Future<bool> exists(String item, String collection, String field) async {
+  return await FirebaseFirestore.instance
+      .collection(collection)
+      .get()
+      .then((value) => value.docs.any((element) => element[field] == item));
 }
 
 Future<List> removeFrom(

@@ -9,27 +9,24 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:sayibulmaca/Options.dart';
-import 'package:sayibulmaca/championship_details.dart';
+import 'package:sayibulmaca/league_details.dart';
 
 import 'AuthenticationServices.dart';
 import 'Users.dart';
 import 'helpers.dart';
-import 'championship.dart';
+import 'league.dart';
 import 'main.dart';
 import 'package:badges/badges.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 List myRequests = List.empty(growable: true);
 List myFriends = List.empty(growable: true);
-List joinedChampionships = List.empty(growable: true);
-Future<List> loadChampionships(Users user, int currentPage) async {
+List joinedLeagues = List.empty(growable: true);
+Future<List> loadLeagues(Users user, int currentPage) async {
   if (currentPage != 2) return List.empty();
-  List<Championship> championships = List.empty(growable: true);
+  List<League> leagues = List.empty(growable: true);
   try {
-    await FirebaseFirestore.instance
-        .collection("Championships")
-        .get()
-        .then((value) {
+    await FirebaseFirestore.instance.collection("Leagues").get().then((value) {
       value.docs.forEach((element) {
         Options options = Options(
             game: 'guess',
@@ -38,21 +35,21 @@ Future<List> loadChampionships(Users user, int currentPage) async {
             bestOf: element.get('bestOf'),
             increasingDiff: element.get('increasingDiff'),
             length: element.get('length'));
-        championships.add(Championship(
+        leagues.add(League(
             id: element.id,
             name: element.get('name'),
             host: element.get('host'),
             players: element.get('players'),
-            options: options));
+            options: options,
+            matchups: []));
         if (element.get('players').contains(jsonEncode(user)))
-          joinedChampionships.add(element.id);
+          joinedLeagues.add(element.id);
       });
     });
-    print(joinedChampionships);
   } catch (e) {
     return List.empty();
   }
-  return championships;
+  return leagues;
 }
 
 class ExplorePageSend extends StatefulWidget {
@@ -74,9 +71,7 @@ class ExplorePage extends State<ExplorePageSend> {
   TextEditingController tecName = TextEditingController();
   TextEditingController tecOptions = TextEditingController();
   TextEditingController tecEndDate = TextEditingController();
-  Options? options;
-  // int optionsLength = 3, optionsDuration = 30, optionsRound = 1;
-  // bool optionsDurationEnabled = false, optionsIncreasingDiff = false;
+  Options options = Options.empty();
 
   Future<int> getXp() async {
     DocumentReference docUser =
@@ -157,7 +152,7 @@ class ExplorePage extends State<ExplorePageSend> {
     });
   }
 
-  Widget _getTile(snapshot, index) {
+  Widget _getLeagueTile(snapshot, index) {
     return Container(
       width: MediaQuery.of(context).size.width * .5,
       child: Padding(
@@ -167,13 +162,16 @@ class ExplorePage extends State<ExplorePageSend> {
           child: ListTile(
             onTap: () {
               Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => ChampionshipDetailsPageSend(
-                        championship: snapshot.data[index],
+                  builder: (context) => LeagueDetailsPageSend(
+                        league: snapshot.data[index],
                         user: this.user,
                       )));
             },
             tileColor: Theme.of(context).cardColor,
             title: Text(snapshot.data[index].name),
+            subtitle: Text(snapshot.data[index].players.length.toString() +
+                ' ' +
+                'players'.tr()),
             trailing: snapshot.data[index].host == this.user!.email
                 ? ElevatedButton.icon(
                     onPressed: () async {
@@ -181,7 +179,7 @@ class ExplorePage extends State<ExplorePageSend> {
                           context: context,
                           builder: (context) => AlertDialog(
                                 actionsAlignment: MainAxisAlignment.center,
-                                title: Text('alertDeleteChampionship'.tr()),
+                                title: Text('alertDeleteLeague'.tr()),
                                 actions: [
                                   ElevatedButton(
                                       onPressed: () {
@@ -191,7 +189,7 @@ class ExplorePage extends State<ExplorePageSend> {
                                   ElevatedButton(
                                       onPressed: () async {
                                         await FirebaseFirestore.instance
-                                            .collection("Championships")
+                                            .collection("Leagues")
                                             .doc(snapshot.data[index].id)
                                             .delete();
                                         Navigator.pop(context);
@@ -203,13 +201,13 @@ class ExplorePage extends State<ExplorePageSend> {
                     },
                     icon: Icon(Icons.delete),
                     label: Text('delete'.tr()))
-                : joinedChampionships.contains(snapshot.data[index].id)
+                : joinedLeagues.contains(snapshot.data[index].id)
                     ? ElevatedButton.icon(
                         onPressed: () async {
-                          await removeFrom(this.user!.email, 'Championships',
+                          await removeFrom(this.user!.email, 'Leagues',
                               snapshot.data[index].id, 'players');
                           setState(() {
-                            joinedChampionships.removeWhere((element) =>
+                            joinedLeagues.removeWhere((element) =>
                                 element == snapshot.data[index].id);
                           });
                         },
@@ -219,17 +217,17 @@ class ExplorePage extends State<ExplorePageSend> {
                         onPressed: () async {
                           DocumentReference documentReference =
                               FirebaseFirestore.instance
-                                  .collection("Championships")
+                                  .collection("Leagues")
                                   .doc(snapshot.data[index].id);
                           var doc = await documentReference.get();
                           List players = doc.get('players');
                           players.add(jsonEncode(this.user));
                           FirebaseFirestore.instance
-                              .collection("Championships")
+                              .collection("Leagues")
                               .doc(snapshot.data[index].id)
                               .update({'players': players});
                           setState(() {
-                            joinedChampionships.add(snapshot.data[index].id);
+                            joinedLeagues.add(snapshot.data[index].id);
                           });
                         },
                         icon: Icon(Icons.start),
@@ -281,8 +279,8 @@ class ExplorePage extends State<ExplorePageSend> {
                   text: 'friends'.tr(),
                 ),
                 Tab(
-                  icon: Icon(Icons.show_chart),
-                  text: 'championship'.tr(),
+                  icon: Icon(Icons.leaderboard_outlined),
+                  text: 'leagues'.tr(),
                 ),
               ],
             ),
@@ -531,35 +529,45 @@ class ExplorePage extends State<ExplorePageSend> {
                     shrinkWrap: true,
                     itemCount: myFriends.length,
                     itemBuilder: (BuildContext context, int idx) {
-                      return ListTile(
-                        title: Text(myFriends[idx]),
-                        trailing: ElevatedButton.icon(
-                          icon: Icon(Icons.block),
-                          label: Text('unfriend'.tr()),
-                          onPressed: () async {
-                            popFriend(myFriends[idx]);
-                          },
+                      return Card(
+                        elevation: 1,
+                        child: ListTile(
+                          title: Text(myFriends[idx]),
+                          trailing: ElevatedButton.icon(
+                            icon: Icon(Icons.no_accounts_outlined),
+                            label: Text('unfriend'.tr()),
+                            onPressed: () async {
+                              popFriend(myFriends[idx]);
+                            },
+                          ),
                         ),
                       );
                     }),
             FutureBuilder(
-              future: loadChampionships(this.user!, currentPage),
+              future: loadLeagues(this.user!, currentPage),
               builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-                if (snapshot.hasData && snapshot.data.isNotEmpty)
-                  return ListView.builder(
-                    itemCount: snapshot.data.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      return _getTile(snapshot, index);
-                    },
-                  );
-                else
+                if (snapshot.hasData) {
+                  if (snapshot.data.isNotEmpty)
+                    return ListView.builder(
+                      itemCount: snapshot.data.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        return _getLeagueTile(snapshot, index);
+                      },
+                    );
+                  else if (snapshot.data.isEmpty)
+                    return Center(
+                      child: Text('noLeagues'.tr()),
+                    );
+                  else
+                    return Center(child: CircularProgressIndicator());
+                } else
                   return Center(child: CircularProgressIndicator());
               },
             )
           ]),
           floatingActionButton: currentPage == 2
               ? FloatingActionButton.extended(
-                  label: Text('createChampionship'.tr()),
+                  label: Text('createLeague'.tr()),
                   icon: Icon(Icons.add),
                   onPressed: () async {
                     DateTime? date;
@@ -570,12 +578,13 @@ class ExplorePage extends State<ExplorePageSend> {
                           return AlertDialog(
                             actionsAlignment: MainAxisAlignment.center,
                             title: Text(
-                              'createChampionship'.tr(),
+                              'createLeague'.tr(),
                               textAlign: TextAlign.center,
                             ),
                             content: SingleChildScrollView(
                               child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
                                 children: [
                                   TextField(
                                     controller: tecName,
@@ -613,7 +622,7 @@ class ExplorePage extends State<ExplorePageSend> {
                                       label: Text('settings'.tr()),
                                       onPressed: () async {
                                         options = await popupOptions(
-                                            context, options);
+                                            context, options, '');
                                       }),
                                 ],
                               ),
@@ -627,27 +636,35 @@ class ExplorePage extends State<ExplorePageSend> {
                               ElevatedButton(
                                   onPressed: () async {
                                     if (tecName.text != '') {
-                                      await FirebaseFirestore.instance
-                                          .collection('Championships')
-                                          .doc()
-                                          .set({
-                                        'name': tecName.text,
-                                        'host': this.user?.email,
-                                        'players': List.filled(
-                                            1, jsonEncode(this.user)),
-                                        'length': options?.length,
-                                        'duration': options?.duration,
-                                        'endDate': tecEndDate.text,
-                                        'bestOf': options?.bestOf,
-                                        'increasingDiff':
-                                            options?.increasingDiff
-                                      });
-                                      ScaffoldMessenger.maybeOf(context)
-                                          ?.showSnackBar(SnackBar(
-                                              content: Text(tecName.text +
-                                                  ' ' +
-                                                  'championshipCreated'.tr())));
-                                      Navigator.pop(context);
+                                      if (!await exists(
+                                          tecName.text, 'Leagues', 'name')) {
+                                        await FirebaseFirestore.instance
+                                            .collection('Leagues')
+                                            .doc()
+                                            .set({
+                                          'name': tecName.text,
+                                          'host': this.user?.email,
+                                          'players': List.filled(
+                                              1, jsonEncode(this.user)),
+                                          'length': options.length,
+                                          'duration': options.duration,
+                                          'endDate': tecEndDate.text,
+                                          'bestOf': options.bestOf,
+                                          'increasingDiff':
+                                              options.increasingDiff
+                                        });
+                                        ScaffoldMessenger.maybeOf(context)
+                                            ?.showSnackBar(SnackBar(
+                                                content: Text(tecName.text +
+                                                    ' ' +
+                                                    'leagueCreated'.tr())));
+                                        Navigator.pop(context);
+                                        setState(() {});
+                                      } else
+                                        ScaffoldMessenger.maybeOf(context)
+                                            ?.showSnackBar(SnackBar(
+                                                content: Text(
+                                                    'alertExistsLeague'.tr())));
                                     } else
                                       ScaffoldMessenger.maybeOf(context)
                                           ?.showSnackBar(SnackBar(
