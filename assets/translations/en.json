@@ -21,9 +21,12 @@
     "alertDeleteLeague": "Are you sure wish to delete this league?",
     "alertLeaveGame": "Are you sure you want to leave the game?",
     "alertInsufficient": "Not enough credits to buy a digit, need: ",
+    "hostCancelled": "Host has cancelled the game, returning...",
+    "inviting": "is inviting you to a game",
     "signOut": "Sign Out",
     "yes": "Yes",
     "no": "No",
+    "close": "Close",
     "apply": "Apply",
     "waitingStart": "Waiting for the game to begin",
     "waitingPlayers": "Waiting for players",
@@ -47,7 +50,7 @@
     "settings": "Settings",
     "soundEffects": "Sound effects",
     "language": "Language",
-    "startGame": "Start Game",
+    "start": "Start",
     "startLeague": "Start the League",
     "level": "Level ",
     "help": "Help",
@@ -100,6 +103,7 @@
     "friends": "Friends",
     "unfriend": "Remove from friends",
     "kickOut": "Kick Out",
+    "invitation": "Invitation",
     "invite": "Invite",
     "noUser": "No user found",
     "sentInvite": "Sent a game invite to",
@@ -113,5 +117,6 @@
     "createLeague": "Create a league",
     "leagueCreated": "League has been created",
     "toolTipPlayers": "more players are required",
-    "leagueStarted": "League Started"
+    "leagueStarted": "League Started",
+    "matchups": "Matchups"
 }

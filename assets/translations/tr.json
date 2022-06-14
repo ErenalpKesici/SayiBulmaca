@@ -21,9 +21,12 @@
     "alertDeleteLeague": "Ligi silmek istediğinize emin misiniz?",
     "alertLeaveGame": "Oyundan çıkmak istediğinize emin misiniz?",
     "alertInsufficient": "Hane satın almak için yeterli kredi yok, gereken: ",
+    "hostCancelled": "Kurucu oyunu iptal etti, geri dönülüyor...",
+    "inviting": " seni oyuna davet ediyor",
     "signOut": "Çıkış Yap",
     "yes": "Evet",
     "no": "Hayır",
+    "close": "Kapat",
     "apply": "Uygula",
     "home": "Ana Sayfa",
     "waitingStart": "Oyunun başlatılması bekleniyor",
@@ -44,7 +47,7 @@
     "deleteAccount": "Hesabı Sil",
     "delete": "Sil",
     "logout": "Hesaptan Çıkış Yap",
-    "startGame": "Oyunu Başlat",
+    "start": "Başlat",
     "startLeague": "Ligi Başlat",
     "explore": "Keşfet",    
     "account": "Hesap",    
@@ -99,6 +102,7 @@
     "friends": "Arkadaşlar",
     "unfriend": "Arkadaşdan çıkar",
     "kickOut": "Çıkar",
+    "invitation": "Davet",
     "invite": "Davet Et",
     "noUser": "Kullanıcı bulunamadı",
     "sentInvite": "Oyun daveti gönderildi",
@@ -111,5 +115,6 @@
     "createLeague": "Lig Oluştur",
     "leagueCreated": "Lig oluşturuldu",
     "toolTipPlayers": "oyuncu daha gerekiyor",
-    "leagueStarted": "Başlayan Lig"
+    "leagueStarted": "Başlayan Lig",
+    "matchups": "Maçlar"
 }

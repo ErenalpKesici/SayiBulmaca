@@ -46,6 +46,7 @@ dependencies:
   badges: ^2.0.2
   url_launcher: ^6.1.2
   intl: ^0.17.0
+  onesignal_flutter: ^3.3.0
   get:
   get_storage:
   # The following adds the Cupertino Icons font to your application.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +6,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sayibulmaca/Options.dart';
+
+import 'package:http/http.dart';
+import 'Users.dart';
+import 'main.dart';
 
 List<BottomNavigationBarItem> bottomNavItems() {
   return [
@@ -193,6 +198,227 @@ Future<List> removeFrom(
       .doc(documentId)
       .update({field: fieldList});
   return fieldList;
+}
+
+List invites = List.empty(growable: true);
+
+Future<void> gameInvite(BuildContext context, Users user, friend) async {
+  DocumentReference docRef =
+      FirebaseFirestore.instance.collection("Users").doc(friend);
+  var doc = await docRef.get();
+  try {
+    invites = doc.get('invite');
+  } catch (e) {}
+  invites.add(user.email!);
+  FirebaseFirestore.instance
+      .collection("Users")
+      .doc(friend)
+      .update({'invite': invites});
+  ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text('sentInvite'.tr() + ': ' + friend)));
+}
+
+Future<Response> pushInvite(Users user, String inviting, String type) async {
+  return await post(Uri.parse('https://onesignal.com/api/v1/notifications'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization':
+            'Basic ZTZiOGNlYTMtZDU5Ni00YWI4LWE2YjQtZTQ3MmU2OTliOWEx',
+        'Content-Type': 'application/json'
+      },
+      body: jsonEncode({
+        'include_external_user_ids': [inviting],
+        'name': 'INTERNAL_CAMPAIGN_NAME',
+        'app_id': 'a57bdd86-0a91-46d4-8a1b-7951fdb6650d',
+        'headings': {
+          'en': (type == 'league' ? 'league'.tr() : '') +
+              (' ' + 'invitation'.tr())
+        },
+        'contents': {'en': user.name! + ' ' + 'inviting'.tr()},
+        'android_channel_id': '81667261-8f01-415c-add7-6c89c1149917',
+        'buttons': [
+          {'id': 'ignore_', 'text': 'close'.tr()},
+          {'id': 'join_' + user.email!, 'text': 'join'.tr()}
+        ]
+      }));
+}
+
+Future<void> startGame(BuildContext context, Users user, Options options,
+    List? friends, String type) async {
+  Timer timerPlayers;
+  if (options.multiplayer) {
+    FirebaseFirestore.instance.collection('Rooms').doc(user.email).set({
+      'players': List.filled(1, jsonEncode(user)),
+      'game': options.game,
+      'length': options.length,
+      'status': 'ready',
+      'bestOf': options.bestOf,
+      'scores': List.filled(1, ''),
+      'duration': options.duration,
+      'roundInserted': false,
+      'increasingDiff': options.increasingDiff
+    });
+    DocumentReference doc =
+        FirebaseFirestore.instance.collection("Rooms").doc(user.email);
+    List playersFound = new List.empty(growable: true);
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return StatefulBuilder(builder: (context, setInnerState) {
+            timerPlayers =
+                Timer.periodic(new Duration(seconds: 5), (timer) async {
+              var document = await doc.get();
+              if (document.exists && document.get('status') == 'ready')
+                setInnerState(() {
+                  playersFound = document.get('players');
+                });
+              else
+                timer.cancel();
+            });
+            return AlertDialog(
+              title: Center(
+                  child: Text("searchPlayers".tr().toString(),
+                      textAlign: TextAlign.center)),
+              content: Container(
+                height: 125,
+                child: Column(
+                  children: [
+                    Text(
+                      (playersFound.length != 0
+                              ? (playersFound.length - 1).toString()
+                              : '0') +
+                          'found'.tr().toString(),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(
+                      height: 50,
+                    ),
+                    CircularProgressIndicator(),
+                  ],
+                ),
+              ),
+              actions: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ElevatedButton(
+                          onPressed: () {
+                            timerPlayers.cancel();
+                            FirebaseFirestore.instance
+                                .collection('Rooms')
+                                .doc(user.email)
+                                .delete();
+                            Navigator.pop(context);
+                          },
+                          child: Text('abort'.tr().toString())),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                        child: friends == null || friends.isEmpty
+                            ? null
+                            : ElevatedButton(
+                                onPressed: () async {
+                                  showDialog(
+                                      context: context,
+                                      builder: (context) {
+                                        return AlertDialog(
+                                          title: Text(
+                                            'friends'.tr() +
+                                                " " +
+                                                'invite'.tr(),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          content: SizedBox(
+                                            height: MediaQuery.of(context)
+                                                    .size
+                                                    .height *
+                                                .3,
+                                            width: MediaQuery.of(context)
+                                                    .size
+                                                    .width *
+                                                .7,
+                                            child: StatefulBuilder(
+                                              builder: (BuildContext context,
+                                                  void Function(void Function())
+                                                      setState) {
+                                                return ListView.builder(
+                                                    shrinkWrap: true,
+                                                    itemCount: friends.length,
+                                                    itemBuilder:
+                                                        (BuildContext context,
+                                                            int idx) {
+                                                      return ListTile(
+                                                        title: Text(friends[idx]
+                                                            .split('@')
+                                                            .first),
+                                                        trailing:
+                                                            ElevatedButton.icon(
+                                                          icon: Icon(Icons
+                                                              .send_outlined),
+                                                          label: Text(
+                                                              'invite'.tr()),
+                                                          onPressed: () async {
+                                                            await pushInvite(
+                                                                user,
+                                                                friends[idx],
+                                                                'normal');
+                                                            Navigator.pop(
+                                                                context);
+                                                          },
+                                                        ),
+                                                      );
+                                                    });
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      });
+                                },
+                                child: Text('invite'.tr())),
+                      ),
+                      ElevatedButton(
+                          onPressed: playersFound.length > 1
+                              ? () {
+                                  FirebaseFirestore.instance
+                                      .collection('Rooms')
+                                      .doc(user.email)
+                                      .update({'status': 'playing'});
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                      builder: (context) => GamePageSend(
+                                          user, user.email, options, type)));
+                                }
+                              : null,
+                          child: Text('start'.tr().toString()))
+                    ],
+                  ),
+                )
+              ],
+            );
+          });
+        });
+  } else {
+    FirebaseFirestore.instance.collection("Rooms").doc(user.email).set({
+      'players': List.filled(1, jsonEncode(user)),
+      'game': options.game,
+      'length': options.length,
+      'status': 'playing',
+      'scores': List.filled(1, ''),
+      'bestOf': options.bestOf,
+      'roundInserted': false,
+      'increasingDiff': options.increasingDiff
+    });
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => GamePageSend(user, user.email, options, '')));
+  }
+}
+
+List decodeList(List list) {
+  List ret = List.empty(growable: true);
+  list.forEach((element) {
+    ret.add(jsonDecode(element));
+  });
+  return ret;
 }
 
 void _nameFromMail(mail) async {

@@ -28,6 +28,7 @@ import 'account_settings.dart';
 import 'explore.dart';
 import 'helpers.dart';
 import 'package:intl/intl.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import 'league.dart';
 import 'league_page.dart';
@@ -77,6 +78,20 @@ void main() async {
   await GetStorage.init();
   _initPrefs();
   introShown.writeIfNull('displayed', false);
+
+//ONESIGNAL Push
+  OneSignal.shared.setLogLevel(OSLogLevel.verbose, OSLogLevel.none);
+  OneSignal.shared.setAppId("a57bdd86-0a91-46d4-8a1b-7951fdb6650d");
+  OneSignal.shared.promptUserForPushNotificationPermission().then((accepted) {
+    print("Accepted permission: $accepted");
+  });
+  OneSignal.shared.setNotificationWillShowInForegroundHandler(
+      (OSNotificationReceivedEvent event) {
+    // Will be called whenever a notification is received in foreground
+    // Display Notification, pass null param for not displaying the notification
+    event.complete(event.notification);
+  });
+
   runApp(EasyLocalization(supportedLocales: [
     Locale('tr'),
     Locale('en'),
@@ -313,6 +328,14 @@ class InitialPage extends State<InitialPageSend> {
                     .collection("Users")
                     .doc(userCredential.user!.email);
                 var document = await doc.get();
+                try {
+                  document.get('picture');
+                } catch (e) {
+                  FirebaseFirestore.instance
+                      .collection("Users")
+                      .doc(userCredential.user!.email)
+                      .update({'picture': userCredential.user!.photoURL});
+                }
                 Users user = new Users(
                     email: userCredential.user!.email,
                     password: userCredential.user!.uid,
@@ -623,7 +646,8 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
                   duration: document.get('duration'),
                   bestOf: document.get('bestOf'),
                   increasingDiff: document.get('increasingDiff'),
-                  length: document.get('length')))));
+                  length: document.get('length')),
+              '')));
       timer.cancel();
       timerPlayers?.cancel();
     }
@@ -659,7 +683,7 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
                     SizedBox(
                       height: 50,
                     ),
-                    CircularProgressIndicator(),
+                    LinearProgressIndicator(),
                   ],
                 ),
               ),
@@ -717,6 +741,7 @@ class SearchPageSend extends StatefulWidget {
   SearchPageSend({@required this.user});
   @override
   State<StatefulWidget> createState() {
+    OneSignal.shared.setExternalUserId(this.user!.email!);
     return SearchPage(this.user);
   }
 }
@@ -730,11 +755,85 @@ class SearchPage extends State<SearchPageSend> {
   @override
   void initState() {
     checkNetwork(context);
-    scanInvites(this.user, context);
+    // scanInvites(this.user, context);
+    pushInviteReceived();
     super.initState();
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (EasyLocalization.of(context)!.locale != Locale(this.user!.language!))
         EasyLocalization.of(context)!.setLocale(Locale(this.user!.language!));
+    });
+  }
+
+  void pushInviteReceived() {
+    OneSignal.shared.setNotificationOpenedHandler(
+        (OSNotificationOpenedResult result) async {
+      if (result.action?.type == OSNotificationActionType.actionTaken) {
+        List<String> btn = result.action!.actionId!.split('_');
+        if (result.action?.type == OSNotificationActionType.opened ||
+            btn.first == 'join') {
+          DocumentReference documentReference =
+              FirebaseFirestore.instance.collection("Rooms").doc(btn.last);
+          var doc = await documentReference.get();
+          List players = doc.get('players');
+          players.add(jsonEncode(this.user));
+          await FirebaseFirestore.instance
+              .collection("Rooms")
+              .doc(btn.last)
+              .update({
+            'players': players,
+            'scores': List.filled(players.length, '')
+          });
+          Timer.periodic(new Duration(seconds: 1), (timer) async {
+            doc = await documentReference.get();
+            String? status;
+            try {
+              status = doc.get('status');
+            } catch (e) {
+              toMainPage(context, this.user!);
+              return;
+            }
+            if (status == 'playing') {
+              Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => GamePageSend(
+                      user,
+                      btn.last,
+                      new Options(
+                          game: doc.get('game'),
+                          multiplayer: true,
+                          duration: doc.get('duration'),
+                          bestOf: doc.get('bestOf'),
+                          increasingDiff: doc.get('increasingDiff'),
+                          length: doc.get('length')),
+                      '')));
+              timer.cancel();
+            }
+          });
+          showDialog(
+              barrierDismissible: false,
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                    title: Center(child: Text("waitingStart".tr().toString())),
+                    content: LinearProgressIndicator(),
+                    actionsAlignment: MainAxisAlignment.center,
+                    actions: [
+                      ElevatedButton.icon(
+                          onPressed: () async {
+                            players.removeWhere((element) =>
+                                jsonDecode(element)['email'] ==
+                                this.user!.email);
+                            await FirebaseFirestore.instance
+                                .collection("Rooms")
+                                .doc(btn.last)
+                                .update({'players': players});
+                            Navigator.pop(context);
+                          },
+                          icon: Icon(Icons.close),
+                          label: Text('close'.tr()))
+                    ]);
+              });
+        } else if (result.action!.actionId == 'ignore') {}
+      }
     });
   }
 
@@ -854,7 +953,7 @@ class SearchPage extends State<SearchPageSend> {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          CircularProgressIndicator(),
+                                          LinearProgressIndicator(),
                                         ],
                                       ),
                                     ),
@@ -1356,7 +1455,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
   List<String> invited = List.empty(growable: true);
   List friends = List.empty(growable: true);
   SetupPage(this.user);
-  void _loadFriends() async {
+  Future<void> _loadFriends() async {
     DocumentReference docRef =
         FirebaseFirestore.instance.collection("Users").doc(user!.email!);
     var doc = await docRef.get();
@@ -1389,7 +1488,6 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
     options.increasingDiff = (prefs?.getBool('increasingDiff') == null
         ? options.increasingDiff
         : prefs?.getBool('increasingDiff')!)!;
-    _loadFriends();
     super.initState();
   }
 
@@ -1424,20 +1522,20 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
     print(state);
   }
 
-  void popInvites() async {
-    invited.forEach((element) async {
-      DocumentReference docRef =
-          FirebaseFirestore.instance.collection("Users").doc(element);
-      var doc = await docRef.get();
-      List ins = doc.get('invite');
-      ins.removeWhere((element) => element == user!.email!);
-      FirebaseFirestore.instance
-          .collection("Users")
-          .doc(element)
-          .update({'invite': ins});
-    });
-    invited = List.empty(growable: true);
-  }
+  // void popInvites() async {
+  //   invited.forEach((element) async {
+  //     DocumentReference docRef =
+  //         FirebaseFirestore.instance.collection("Users").doc(element);
+  //     var doc = await docRef.get();
+  //     List ins = doc.get('invite');
+  //     ins.removeWhere((element) => element == user!.email!);
+  //     FirebaseFirestore.instance
+  //         .collection("Users")
+  //         .doc(element)
+  //         .update({'invite': ins});
+  //   });
+  //   invited = List.empty(growable: true);
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -1612,224 +1710,7 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                 onPressed: () async {
                   if (durationEnabled == false || durationEnabled == null)
                     options.duration = -1;
-                  if (options.multiplayer) {
-                    FirebaseFirestore.instance
-                        .collection('Rooms')
-                        .doc(this.user!.email)
-                        .set({
-                      'players': List.filled(1, jsonEncode(this.user)),
-                      'game': options.game,
-                      'length': options.length,
-                      'status': 'ready',
-                      'bestOf': options.bestOf,
-                      'scores': List.filled(1, ''),
-                      'duration': options.duration,
-                      'roundInserted': false,
-                      'increasingDiff': options.increasingDiff
-                    });
-                    DocumentReference doc = FirebaseFirestore.instance
-                        .collection("Rooms")
-                        .doc(this.user?.email);
-                    List playersFound = new List.empty(growable: true);
-                    showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (BuildContext context) {
-                          return StatefulBuilder(
-                              builder: (context, setInnerState) {
-                            timerPlayers = Timer.periodic(
-                                new Duration(seconds: 5), (timer) async {
-                              var document = await doc.get();
-                              if (document.exists &&
-                                  document.get('status') == 'ready')
-                                setInnerState(() {
-                                  playersFound = document.get('players');
-                                });
-                              else
-                                timer.cancel();
-                            });
-                            return AlertDialog(
-                              title: Center(
-                                  child: Text("searchPlayers".tr().toString(),
-                                      textAlign: TextAlign.center)),
-                              content: Container(
-                                height: 125,
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      (playersFound.length != 0
-                                              ? (playersFound.length - 1)
-                                                  .toString()
-                                              : '0') +
-                                          'found'.tr().toString(),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    SizedBox(
-                                      height: 50,
-                                    ),
-                                    CircularProgressIndicator(),
-                                  ],
-                                ),
-                              ),
-                              actionsAlignment: MainAxisAlignment.center,
-                              actions: [
-                                ElevatedButton(
-                                    onPressed: () {
-                                      timerPlayers?.cancel();
-                                      FirebaseFirestore.instance
-                                          .collection('Rooms')
-                                          .doc(this.user!.email)
-                                          .delete();
-                                      Navigator.pop(context);
-                                      popInvites();
-                                    },
-                                    child: Text('abort'.tr().toString())),
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(4, 0, 4, 0),
-                                  child: friends.isEmpty
-                                      ? null
-                                      : ElevatedButton(
-                                          onPressed: () async {
-                                            showDialog(
-                                                context: context,
-                                                builder: (context) {
-                                                  return AlertDialog(
-                                                    title: Text(
-                                                      'friends'.tr() +
-                                                          " " +
-                                                          'invite'.tr(),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                    content: SizedBox(
-                                                      height:
-                                                          MediaQuery.of(context)
-                                                                  .size
-                                                                  .height *
-                                                              .3,
-                                                      width:
-                                                          MediaQuery.of(context)
-                                                                  .size
-                                                                  .width *
-                                                              .7,
-                                                      child: StatefulBuilder(
-                                                        builder: (BuildContext
-                                                                context,
-                                                            void Function(
-                                                                    void
-                                                                        Function())
-                                                                setState) {
-                                                          return ListView
-                                                              .builder(
-                                                                  shrinkWrap:
-                                                                      true,
-                                                                  itemCount:
-                                                                      friends
-                                                                          .length,
-                                                                  itemBuilder:
-                                                                      (BuildContext
-                                                                              context,
-                                                                          int idx) {
-                                                                    return ListTile(
-                                                                      title: Text(friends[
-                                                                              idx]
-                                                                          .split(
-                                                                              '@')
-                                                                          .first),
-                                                                      trailing:
-                                                                          ElevatedButton
-                                                                              .icon(
-                                                                        icon: Icon(
-                                                                            Icons.send_outlined),
-                                                                        label: Text(
-                                                                            'invite'.tr()),
-                                                                        onPressed:
-                                                                            () async {
-                                                                          List
-                                                                              invites =
-                                                                              List.empty(growable: true);
-                                                                          DocumentReference
-                                                                              docRef =
-                                                                              FirebaseFirestore.instance.collection("Users").doc(friends[idx]);
-                                                                          var doc =
-                                                                              await docRef.get();
-                                                                          try {
-                                                                            invites =
-                                                                                doc.get('invite');
-                                                                          } catch (e) {}
-                                                                          invites
-                                                                              .add(user!.email!);
-                                                                          FirebaseFirestore
-                                                                              .instance
-                                                                              .collection(
-                                                                                  "Users")
-                                                                              .doc(friends[
-                                                                                  idx])
-                                                                              .update({
-                                                                            'invite':
-                                                                                invites
-                                                                          });
-                                                                          setState(
-                                                                              () {
-                                                                            invited.add(friends[idx]);
-                                                                          });
-                                                                          ScaffoldMessenger.of(context)
-                                                                              .showSnackBar(SnackBar(content: Text('sentInvite'.tr() + ': ' + friends[idx])));
-                                                                          Navigator.pop(
-                                                                              context);
-                                                                        },
-                                                                      ),
-                                                                    );
-                                                                  });
-                                                        },
-                                                      ),
-                                                    ),
-                                                  );
-                                                });
-                                          },
-                                          child: Text('invite'.tr())),
-                                ),
-                                ElevatedButton(
-                                    onPressed: playersFound.length > 1
-                                        ? () {
-                                            FirebaseFirestore.instance
-                                                .collection('Rooms')
-                                                .doc(this.user?.email)
-                                                .update({'status': 'playing'});
-                                            Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        GamePageSend(
-                                                            user,
-                                                            this.user?.email,
-                                                            options)));
-                                            popInvites();
-                                          }
-                                        : null,
-                                    child: Text('startGame'.tr().toString()))
-                              ],
-                            );
-                          });
-                        });
-                  } else {
-                    FirebaseFirestore.instance
-                        .collection("Rooms")
-                        .doc(this.user?.email)
-                        .set({
-                      'players': List.filled(1, jsonEncode(this.user)),
-                      'game': options.game,
-                      'length': options.length,
-                      'status': 'playing',
-                      'scores': List.filled(1, ''),
-                      'bestOf': options.bestOf,
-                      'roundInserted': false,
-                      'increasingDiff': options.increasingDiff
-                    });
-                    Navigator.of(context).push(MaterialPageRoute(
-                        builder: (context) => GamePageSend(
-                            user, this.user?.email, this.options)));
-                  }
+
                   prefs?.setBool('multiplayer', options.multiplayer);
                   prefs?.setBool('durationEnabled', options.duration != -1);
                   prefs?.setInt('duration',
@@ -1837,10 +1718,12 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                   prefs?.setInt('length', options.length);
                   prefs?.setInt('bestOf', options.bestOf);
                   prefs?.setBool('increasingDiff', options.increasingDiff);
+                  await _loadFriends();
+                  await startGame(context, this.user!, options, friends, '');
                 },
                 style: ElevatedButton.styleFrom(padding: EdgeInsets.all(32)),
                 icon: Icon(Icons.play_circle),
-                label: Text('startGame'.tr().toString(),
+                label: Text('start'.tr().toString(),
                     style: TextStyle(fontSize: 30)))
           ],
         ),
@@ -1876,9 +1759,10 @@ class GamePageSend extends StatefulWidget {
   final Users? user;
   final String? room;
   final Options? options;
-  GamePageSend(this.user, this.room, this.options);
+  final String? type;
+  GamePageSend(this.user, this.room, this.options, this.type);
   State<StatefulWidget> createState() {
-    return GamePage(this.user, this.room, this.options);
+    return GamePage(this.user, this.room, this.options, this.type);
   }
 }
 
@@ -1886,6 +1770,7 @@ class GamePage extends State<GamePageSend> {
   Users? user;
   String? room;
   Options? options;
+  String? type;
   TextEditingController entered = new TextEditingController();
   List<Entry> entryList = new List.empty(growable: true);
   Color? btnApplyColor;
@@ -1894,7 +1779,7 @@ class GamePage extends State<GamePageSend> {
   List<String>? otherPlayers;
   bool guessEnabled = true, hintAvailable = true, alertHint = false;
   String _lblText = '';
-  GamePage(this.user, this.room, this.options);
+  GamePage(this.user, this.room, this.options, this.type);
 
   Future<List> _getPlayers(bool _getStatus, bool _getSum) async {
     DocumentReference doc =
@@ -1973,9 +1858,12 @@ class GamePage extends State<GamePageSend> {
           FirebaseFirestore.instance.collection("Rooms").doc(this.room);
       var document = await doc.get();
       List prevScores = document.get('scores');
-      List players = document.get('players');
-      prevScores[players.indexWhere((element) =>
-              jsonDecode(element)['email'] == this.user!.email!)] +=
+      List players = List.empty(growable: true);
+      document.get('players').forEach((element) {
+        players.add(jsonDecode(element));
+      });
+      prevScores[players.indexWhere(
+              (element) => element['email'] == this.user!.email!)] +=
           score.toString();
       FirebaseFirestore.instance
           .collection('Rooms')
@@ -1990,6 +1878,8 @@ class GamePage extends State<GamePageSend> {
           .collection('Users')
           .doc(this.user?.email)
           .update({'xp': this.user?.xp, 'credit': this.user?.credit});
+      print(this.type);
+      if (this.type == 'league') {}
       setState(() {
         guessEnabled = false;
       });
@@ -2086,8 +1976,8 @@ class GamePage extends State<GamePageSend> {
                     timer.cancel();
                     cd = -1;
                     Navigator.of(context).push(MaterialPageRoute(
-                        builder: (context) =>
-                            GamePageSend(user, this.room, this.options)));
+                        builder: (context) => GamePageSend(
+                            user, this.room, this.options, this.type)));
                   } else
                     setState(() {
                       cd--;
@@ -2178,12 +2068,8 @@ class GamePage extends State<GamePageSend> {
     var scores = document.get('scores');
     if (!inserted) {
       roundCounter = scores.first.split('-').length;
-      FirebaseFirestore.instance
-          .collection("Rooms")
-          .doc(this.room)
-          .update({'roundInserted': true});
       bool increasingDiff = document.get('increasingDiff');
-      if (increasingDiff) options?.length++;
+      if (roundCounter != 1 && increasingDiff) options?.length++;
       for (int i = 0; i < scores.length; i++) {
         scores[i] += '-';
       }
@@ -2191,6 +2077,7 @@ class GamePage extends State<GamePageSend> {
           .collection("Rooms")
           .doc(this.room)
           .update({
+        'roundInserted': true,
         'length': options?.length,
         'number': findRandom(options?.length),
         'scores': scores
@@ -2283,7 +2170,7 @@ class GamePage extends State<GamePageSend> {
     return (await showDialog(
             context: context,
             builder: (context) => new AlertDialog(
-                  title: Text("alertleaveGame".tr()),
+                  title: Text("alertLeaveGame".tr()),
                   actions: [
                     ElevatedButton(
                       child: Text('no'.tr().toString()),
