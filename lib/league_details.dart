@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sayibulmaca/league.dart';
 import 'package:sayibulmaca/explore.dart';
+import 'package:sayibulmaca/main.dart';
 import 'package:sayibulmaca/matchup.dart';
 
 import 'Users.dart';
@@ -117,10 +118,14 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
                       triggerMode: TooltipTriggerMode.tap,
                       message: _required == 0
                           ? ''
-                          : _required.toString() + ' ' + 'toolTipPlayers'.tr(),
+                          : league!.matchups == List.empty()
+                              ? 'leagueStarted'.tr()
+                              : _required.toString() +
+                                  ' ' +
+                                  'toolTipPlayers'.tr(),
                       child: ElevatedButton.icon(
-                          onPressed: _required == 0
-                              ? () {
+                          onPressed: _required == 0 && league!.matchups.isEmpty
+                              ? () async {
                                   List<Matchup> matchups =
                                       List.empty(growable: true);
                                   for (int i = 0;
@@ -133,19 +138,20 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
                                         league!.players[i],
                                         league!.players[j]
                                       ], scores: [
-                                        0,
-                                        0
+                                        '-1',
+                                        '-1'
                                       ]));
                                     }
                                   }
-                                  FirebaseFirestore.instance
+                                  await FirebaseFirestore.instance
                                       .collection("Leagues")
                                       .doc(this.league!.id)
                                       .update(
                                           {'matchups': jsonEncode(matchups)});
+                                  league?.matchups = matchups;
                                   Navigator.of(context).push(MaterialPageRoute(
-                                      builder: (context) => LeaguePageSend(
-                                          user: this.user, league: league)));
+                                      builder: (context) =>
+                                          SearchPageSend(user: this.user)));
                                 }
                               : null,
                           icon: Icon(Icons.play_arrow),

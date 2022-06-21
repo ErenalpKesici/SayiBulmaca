@@ -65,10 +65,7 @@ class AuthenticationServices {
     }
   }
 
-  Future<void> deleteProvider(String method) async {
-    if (method == 'google')
-      await signInWithGoogle();
-    else if (method == 'facebook') await signInWithFacebook();
+  Future<void> deleteProvider() async {
     await FirebaseAuth.instance.currentUser?.delete();
   }
 
@@ -83,10 +80,16 @@ class AuthenticationServices {
     return await FirebaseAuth.instance.signInWithCredential(credential);
   }
 
-  Future<UserCredential> signInWithFacebook() async {
-    final LoginResult loginResult = await FacebookAuth.instance.login();
+  Future? signInWithFacebook() async {
+    final LoginResult loginResult =
+        await FacebookAuth.instance.login(permissions: ['user_friends']);
+    if (loginResult.accessToken == null) return null;
     final OAuthCredential facebookAuthCredential =
         FacebookAuthProvider.credential(loginResult.accessToken!.token);
-    return FirebaseAuth.instance.signInWithCredential(facebookAuthCredential);
+    return {
+      'accessToken': loginResult.accessToken!.token,
+      'userCredential': await FirebaseAuth.instance
+          .signInWithCredential(facebookAuthCredential)
+    };
   }
 }

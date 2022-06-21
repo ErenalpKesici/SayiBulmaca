@@ -45,15 +45,21 @@ Future<Users> findUser(email) async {
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Users").doc(email);
   var document = await doc.get();
+  String? accessToken;
+  try {
+    accessToken = document.get('accessToken');
+  } catch (e) {}
   Users ret = new Users(
-      email: document.get('email'),
-      password: document.get('password'),
-      name: document.get('name'),
-      picture: document.get('picture'),
-      language: document.get('language'),
-      xp: document.get('xp'),
-      credit: document.get('credit'),
-      method: document.get('method'));
+    email: document.get('email'),
+    password: document.get('password'),
+    name: document.get('name'),
+    picture: document.get('picture'),
+    language: document.get('language'),
+    xp: document.get('xp'),
+    credit: document.get('credit'),
+    method: document.get('method'),
+  );
+  if (accessToken != null) ret.accessToken = accessToken;
   return ret;
 }
 
@@ -376,10 +382,12 @@ class InitialPage extends State<InitialPageSend> {
               Buttons.FacebookNew,
               text: "loginFacebook".tr(),
               onPressed: () async {
-                UserCredential userCredential = await context
+                var results = await context
                     .read<AuthenticationServices>()
                     .signInWithFacebook();
-                Users? user;
+                if (results == null) return;
+                UserCredential userCredential = results['userCredential'];
+                Users user = Users.token(accessToken: results['accessToken']);
                 if (userCredential.additionalUserInfo!.isNewUser) {
                   await FirebaseFirestore.instance
                       .collection('Users')
@@ -393,7 +401,8 @@ class InitialPage extends State<InitialPageSend> {
                     'status': 0,
                     'xp': 0,
                     'language': systemLanguage,
-                    'method': 'facebook'
+                    'method': 'facebook',
+                    'accessToken': user.accessToken
                   });
                   user = new Users(
                       email: userCredential.user!.email,
@@ -403,7 +412,8 @@ class InitialPage extends State<InitialPageSend> {
                       language: systemLanguage,
                       xp: 0,
                       credit: 0,
-                      method: 'facebook');
+                      method: 'facebook',
+                      accessToken: user.accessToken);
                 } else {
                   var document = await FirebaseFirestore.instance
                       .collection('Users')
@@ -417,7 +427,8 @@ class InitialPage extends State<InitialPageSend> {
                       language: document.get('language'),
                       xp: document.get('xp'),
                       credit: document.get('credit'),
-                      method: document.get('method'));
+                      method: document.get('method'),
+                      accessToken: user.accessToken);
                 }
                 toMainPage(context, user);
               },
@@ -629,27 +640,30 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Rooms").doc(foundRoom);
   Timer.periodic(new Duration(seconds: 1), (timer) async {
-    var document = await doc.get();
-    if (!document.exists) {
-      timer.cancel();
-      return;
-    }
-    if (document.get('status') == 'playing') {
+    try {
       var document = await doc.get();
-      Navigator.of(context).push(MaterialPageRoute(
-          builder: (context) => GamePageSend(
-              user,
-              foundRoom,
-              new Options(
-                  game: document.get('game'),
-                  multiplayer: true,
-                  duration: document.get('duration'),
-                  bestOf: document.get('bestOf'),
-                  increasingDiff: document.get('increasingDiff'),
-                  length: document.get('length')),
-              '')));
+      if (document.get('status') == 'playing') {
+        var document = await doc.get();
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => GamePageSend(
+                user,
+                foundRoom,
+                new Options(
+                    accessMode: document.get('accessMode'),
+                    game: document.get('game'),
+                    multiplayer: true,
+                    duration: document.get('duration'),
+                    bestOf: document.get('bestOf'),
+                    increasingDiff: document.get('increasingDiff'),
+                    length: document.get('length')),
+                null)));
+        timer.cancel();
+        timerPlayers?.cancel();
+      }
+    } catch (e) {
       timer.cancel();
       timerPlayers?.cancel();
+      Navigator.pop(context);
     }
   });
   currentPlayers.add(jsonEncode(user));
@@ -671,9 +685,13 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
               });
           });
           return AlertDialog(
-              title: Center(child: Text("waitingStart".tr().toString())),
+              title: Center(
+                child: Text(
+                  "waitingStart".tr(),
+                ),
+              ),
               content: Container(
-                height: 125,
+                height: MediaQuery.of(context).size.height * .1,
                 child: Column(
                   children: [
                     Text((playersFound.length != 0
@@ -681,7 +699,7 @@ void joinDialog(BuildContext context, String foundRoom, List currentPlayers,
                             : '0') +
                         'found'.tr().toString()),
                     SizedBox(
-                      height: 50,
+                      height: MediaQuery.of(context).size.height * .005,
                     ),
                     LinearProgressIndicator(),
                   ],
@@ -723,6 +741,7 @@ Future<bool> logout(BuildContext context) async {
           child: Text('yes'.tr().toString()),
           onPressed: () async {
             await context.read<AuthenticationServices>().signOut();
+            OneSignal.shared.removeExternalUserId();
             Navigator.pop(c, false);
             signedOut = true;
             Navigator.of(context).push(
@@ -755,7 +774,6 @@ class SearchPage extends State<SearchPageSend> {
   @override
   void initState() {
     checkNetwork(context);
-    // scanInvites(this.user, context);
     pushInviteReceived();
     super.initState();
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -770,15 +788,15 @@ class SearchPage extends State<SearchPageSend> {
       if (result.action?.type == OSNotificationActionType.actionTaken) {
         List<String> btn = result.action!.actionId!.split('_');
         if (result.action?.type == OSNotificationActionType.opened ||
-            btn.first == 'join') {
+            btn[0] == 'join') {
           DocumentReference documentReference =
-              FirebaseFirestore.instance.collection("Rooms").doc(btn.last);
+              FirebaseFirestore.instance.collection("Rooms").doc(btn[1]);
           var doc = await documentReference.get();
           List players = doc.get('players');
           players.add(jsonEncode(this.user));
           await FirebaseFirestore.instance
               .collection("Rooms")
-              .doc(btn.last)
+              .doc(btn[1])
               .update({
             'players': players,
             'scores': List.filled(players.length, '')
@@ -789,6 +807,7 @@ class SearchPage extends State<SearchPageSend> {
             try {
               status = doc.get('status');
             } catch (e) {
+              timer.cancel();
               toMainPage(context, this.user!);
               return;
             }
@@ -796,15 +815,18 @@ class SearchPage extends State<SearchPageSend> {
               Navigator.of(context).push(MaterialPageRoute(
                   builder: (context) => GamePageSend(
                       user,
-                      btn.last,
+                      btn[1],
                       new Options(
+                          accessMode: doc.get('accessMode'),
                           game: doc.get('game'),
                           multiplayer: true,
                           duration: doc.get('duration'),
                           bestOf: doc.get('bestOf'),
                           increasingDiff: doc.get('increasingDiff'),
                           length: doc.get('length')),
-                      '')));
+                      btn.length > 2
+                          ? {'leagueId': btn[2], 'matchupIdx': btn[3]}
+                          : null)));
               timer.cancel();
             }
           });
@@ -822,6 +844,13 @@ class SearchPage extends State<SearchPageSend> {
                             players.removeWhere((element) =>
                                 jsonDecode(element)['email'] ==
                                 this.user!.email);
+                            try {
+                              FirebaseFirestore.instance
+                                  .collection("Rooms")
+                                  .doc(btn.last);
+                            } catch (e) {
+                              return;
+                            }
                             await FirebaseFirestore.instance
                                 .collection("Rooms")
                                 .doc(btn.last)
@@ -855,6 +884,7 @@ class SearchPage extends State<SearchPageSend> {
                           id: element.id,
                           name: league['name'],
                           options: Options(
+                              accessMode: 'private',
                               bestOf: league['bestOf'],
                               duration: league['duration'],
                               game: '',
@@ -924,7 +954,8 @@ class SearchPage extends State<SearchPageSend> {
                             .get()
                             .then((value) {
                           value.docs.forEach((result) {
-                            if (result.get('status') == 'ready') {
+                            if (result.get('accessMode') == 'public' &&
+                                result.get('status') == 'ready') {
                               timer.cancel();
                               foundRoom = result.id;
                               currentPlayers = result.get('players');
@@ -1060,7 +1091,8 @@ class JoinGamePage extends State<JoinGamePageSend> {
       roomsFound = List.empty(growable: true);
       await FirebaseFirestore.instance.collection("Rooms").get().then((value) {
         value.docs.forEach((result) async {
-          if (result.get('status') == 'ready') {
+          if (result.get('accessMode') == 'public' &&
+              result.get('status') == 'ready') {
             tmp.add(new Room(
                 creator: result.id,
                 currentPlayers: result.get('players'),
@@ -1229,7 +1261,7 @@ class AccountPage extends State<AccountPageSend> {
         body: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            user!.picture! != ''
+            user!.picture != ''
                 ? Image.network(
                     user!.picture!,
                     width: 100,
@@ -1522,21 +1554,6 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
     print(state);
   }
 
-  // void popInvites() async {
-  //   invited.forEach((element) async {
-  //     DocumentReference docRef =
-  //         FirebaseFirestore.instance.collection("Users").doc(element);
-  //     var doc = await docRef.get();
-  //     List ins = doc.get('invite');
-  //     ins.removeWhere((element) => element == user!.email!);
-  //     FirebaseFirestore.instance
-  //         .collection("Users")
-  //         .doc(element)
-  //         .update({'invite': ins});
-  //   });
-  //   invited = List.empty(growable: true);
-  // }
-
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -1575,13 +1592,28 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
           children: [
             CheckboxListTile(
               title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 20, 0),
-                    child: Icon(Icons.swap_horizontal_circle),
-                  ),
+                  Icon(Icons.swap_horizontal_circle),
                   Text("multiplayer".tr().toString(),
-                      style: TextStyle(fontSize: 24))
+                      style: TextStyle(fontSize: 24)),
+                  ElevatedButton.icon(
+                    // color: Theme.of(context).primaryColor,
+                    icon: options.accessMode == 'private'
+                        ? Icon(Icons.lock)
+                        : Icon(Icons.public),
+                    onPressed: !options.multiplayer
+                        ? null
+                        : () {
+                            setState(() {
+                              if (options.accessMode == 'private')
+                                options.accessMode = 'public';
+                              else
+                                options.accessMode = 'private';
+                            });
+                          },
+                    label: Text(options.accessMode.tr()),
+                  )
                 ],
               ),
               value: options.multiplayer,
@@ -1590,13 +1622,9 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                   options.multiplayer = value!;
                 });
               },
-              controlAffinity: ListTileControlAffinity.trailing,
             ),
             ListTile(
-              leading: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.height),
-              ),
+              leading: Icon(Icons.height),
               title: Text(
                 'digitLength'.tr().toString(),
                 style: TextStyle(fontSize: 24),
@@ -1710,7 +1738,6 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                 onPressed: () async {
                   if (durationEnabled == false || durationEnabled == null)
                     options.duration = -1;
-
                   prefs?.setBool('multiplayer', options.multiplayer);
                   prefs?.setBool('durationEnabled', options.duration != -1);
                   prefs?.setInt('duration',
@@ -1719,9 +1746,9 @@ class SetupPage extends State<SetupPageSend> with WidgetsBindingObserver {
                   prefs?.setInt('bestOf', options.bestOf);
                   prefs?.setBool('increasingDiff', options.increasingDiff);
                   await _loadFriends();
-                  await startGame(context, this.user!, options, friends, '');
+                  await startGame(context, this.user!, options, friends, null);
                 },
-                style: ElevatedButton.styleFrom(padding: EdgeInsets.all(32)),
+                style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
                 icon: Icon(Icons.play_circle),
                 label: Text('start'.tr().toString(),
                     style: TextStyle(fontSize: 30)))
@@ -1759,10 +1786,10 @@ class GamePageSend extends StatefulWidget {
   final Users? user;
   final String? room;
   final Options? options;
-  final String? type;
-  GamePageSend(this.user, this.room, this.options, this.type);
+  final Object? ifLeagueInfo;
+  GamePageSend(this.user, this.room, this.options, this.ifLeagueInfo);
   State<StatefulWidget> createState() {
-    return GamePage(this.user, this.room, this.options, this.type);
+    return GamePage(this.user, this.room, this.options, this.ifLeagueInfo);
   }
 }
 
@@ -1770,7 +1797,7 @@ class GamePage extends State<GamePageSend> {
   Users? user;
   String? room;
   Options? options;
-  String? type;
+  var ifLeagueInfo;
   TextEditingController entered = new TextEditingController();
   List<Entry> entryList = new List.empty(growable: true);
   Color? btnApplyColor;
@@ -1779,7 +1806,7 @@ class GamePage extends State<GamePageSend> {
   List<String>? otherPlayers;
   bool guessEnabled = true, hintAvailable = true, alertHint = false;
   String _lblText = '';
-  GamePage(this.user, this.room, this.options, this.type);
+  GamePage(this.user, this.room, this.options, this.ifLeagueInfo);
 
   Future<List> _getPlayers(bool _getStatus, bool _getSum) async {
     DocumentReference doc =
@@ -1815,7 +1842,6 @@ class GamePage extends State<GamePageSend> {
     String rndNumber = randomNumber.toString();
     String tmpEntered = entered.text;
     int dogru = 0, yanlis = 0;
-    String _hint = '';
     for (int i = 0; i < rndNumber.length; i++) {
       if (rndNumber[i] == tmpEntered[i]) {
         if (!_lblText.split(':').last.contains(rndNumber[i])) {
@@ -1854,6 +1880,20 @@ class GamePage extends State<GamePageSend> {
                   (options!.duration * entryList[0].id)) *
               100)
           .toInt();
+      if (ifLeagueInfo != null) {
+        List matchups = jsonDecode(
+            await getField('Leagues', ifLeagueInfo['leagueId'], 'matchups'));
+        int userIdx = matchups[int.parse(ifLeagueInfo!['matchupIdx'])]
+                ['players']
+            .indexWhere(
+                (player) => jsonDecode(player)['email'] == this.user!.email);
+        matchups[int.parse(ifLeagueInfo!['matchupIdx'])]['scores'][userIdx] =
+            score.toString();
+        FirebaseFirestore.instance
+            .collection('Leagues')
+            .doc(ifLeagueInfo['leagueId'])
+            .update({'matchups': jsonEncode(matchups)});
+      }
       DocumentReference doc =
           FirebaseFirestore.instance.collection("Rooms").doc(this.room);
       var document = await doc.get();
@@ -1878,8 +1918,6 @@ class GamePage extends State<GamePageSend> {
           .collection('Users')
           .doc(this.user?.email)
           .update({'xp': this.user?.xp, 'credit': this.user?.credit});
-      print(this.type);
-      if (this.type == 'league') {}
       setState(() {
         guessEnabled = false;
       });
@@ -1977,7 +2015,7 @@ class GamePage extends State<GamePageSend> {
                     cd = -1;
                     Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) => GamePageSend(
-                            user, this.room, this.options, this.type)));
+                            user, this.room, this.options, this.ifLeagueInfo)));
                   } else
                     setState(() {
                       cd--;

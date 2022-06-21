@@ -116,5 +116,7 @@
     "leagueCreated": "Lig oluşturuldu",
     "toolTipPlayers": "oyuncu daha gerekiyor",
     "leagueStarted": "Başlayan Lig",
-    "matchups": "Maçlar"
+    "matchups": "Maçlar",
+    "public": "Açık",
+    "private": "Özel"
 }

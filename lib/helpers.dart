@@ -4,12 +4,18 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:sayibulmaca/Options.dart';
 
 import 'package:http/http.dart';
 import 'Users.dart';
 import 'main.dart';
+
+Future getField(String collection, String doc, String field) async {
+  DocumentReference docUser =
+      FirebaseFirestore.instance.collection(collection).doc(doc);
+  var documentUser = await docUser.get();
+  return documentUser.get(field);
+}
 
 List<BottomNavigationBarItem> bottomNavItems() {
   return [
@@ -218,7 +224,7 @@ Future<void> gameInvite(BuildContext context, Users user, friend) async {
       .showSnackBar(SnackBar(content: Text('sentInvite'.tr() + ': ' + friend)));
 }
 
-Future<Response> pushInvite(Users user, String inviting, String type) async {
+Future<Response> pushInvite(Users user, String inviting, ifLeagueInfo) async {
   return await post(Uri.parse('https://onesignal.com/api/v1/notifications'),
       headers: {
         'Accept': 'application/json',
@@ -231,23 +237,35 @@ Future<Response> pushInvite(Users user, String inviting, String type) async {
         'name': 'INTERNAL_CAMPAIGN_NAME',
         'app_id': 'a57bdd86-0a91-46d4-8a1b-7951fdb6650d',
         'headings': {
-          'en': (type == 'league' ? 'league'.tr() : '') +
-              (' ' + 'invitation'.tr())
+          'en': ifLeagueInfo != null
+              ? ('league'.tr() + ' ')
+              : '' + 'invitation'.tr()
         },
         'contents': {'en': user.name! + ' ' + 'inviting'.tr()},
         'android_channel_id': '81667261-8f01-415c-add7-6c89c1149917',
         'buttons': [
           {'id': 'ignore_', 'text': 'close'.tr()},
-          {'id': 'join_' + user.email!, 'text': 'join'.tr()}
+          {
+            'id': 'join_' +
+                user.email! +
+                (ifLeagueInfo != null
+                    ? '_' +
+                        ifLeagueInfo['leagueId'] +
+                        '_' +
+                        ifLeagueInfo['matchIdx'].toString()
+                    : ''),
+            'text': 'join'.tr()
+          }
         ]
       }));
 }
 
 Future<void> startGame(BuildContext context, Users user, Options options,
-    List? friends, String type) async {
+    List? friends, ifLeagueInfo) async {
   Timer timerPlayers;
   if (options.multiplayer) {
     FirebaseFirestore.instance.collection('Rooms').doc(user.email).set({
+      'accessMode': options.accessMode,
       'players': List.filled(1, jsonEncode(user)),
       'game': options.game,
       'length': options.length,
@@ -281,7 +299,7 @@ Future<void> startGame(BuildContext context, Users user, Options options,
                   child: Text("searchPlayers".tr().toString(),
                       textAlign: TextAlign.center)),
               content: Container(
-                height: 125,
+                height: MediaQuery.of(context).size.height * .2,
                 child: Column(
                   children: [
                     Text(
@@ -298,6 +316,7 @@ Future<void> startGame(BuildContext context, Users user, Options options,
                   ],
                 ),
               ),
+              actionsAlignment: MainAxisAlignment.center,
               actions: [
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -362,7 +381,7 @@ Future<void> startGame(BuildContext context, Users user, Options options,
                                                             await pushInvite(
                                                                 user,
                                                                 friends[idx],
-                                                                'normal');
+                                                                null);
                                                             Navigator.pop(
                                                                 context);
                                                           },
@@ -379,14 +398,28 @@ Future<void> startGame(BuildContext context, Users user, Options options,
                       ),
                       ElevatedButton(
                           onPressed: playersFound.length > 1
-                              ? () {
+                              ? () async {
                                   FirebaseFirestore.instance
                                       .collection('Rooms')
                                       .doc(user.email)
                                       .update({'status': 'playing'});
+                                  if (ifLeagueInfo != null) {
+                                    List matchups = jsonDecode(await getField(
+                                        'Leagues',
+                                        ifLeagueInfo['leagueId'],
+                                        'matchups'));
+                                    matchups[int.parse(
+                                            ifLeagueInfo['matchupIdx'])]
+                                        ['scores'] = List.filled(2, '0');
+                                    await FirebaseFirestore.instance
+                                        .collection('Leagues')
+                                        .doc(ifLeagueInfo['leagueId'])
+                                        .update(
+                                            {'matchups': jsonEncode(matchups)});
+                                  }
                                   Navigator.of(context).push(MaterialPageRoute(
-                                      builder: (context) => GamePageSend(
-                                          user, user.email, options, type)));
+                                      builder: (context) => GamePageSend(user,
+                                          user.email, options, ifLeagueInfo)));
                                 }
                               : null,
                           child: Text('start'.tr().toString()))
@@ -399,6 +432,7 @@ Future<void> startGame(BuildContext context, Users user, Options options,
         });
   } else {
     FirebaseFirestore.instance.collection("Rooms").doc(user.email).set({
+      'accessMode': 'none',
       'players': List.filled(1, jsonEncode(user)),
       'game': options.game,
       'length': options.length,
@@ -409,7 +443,7 @@ Future<void> startGame(BuildContext context, Users user, Options options,
       'increasingDiff': options.increasingDiff
     });
     Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => GamePageSend(user, user.email, options, '')));
+        builder: (context) => GamePageSend(user, user.email, options, null)));
   }
 }
 

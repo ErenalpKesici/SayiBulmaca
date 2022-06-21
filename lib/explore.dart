@@ -7,10 +7,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_signin_button/button_list.dart';
+import 'package:flutter_signin_button/button_view.dart';
+import 'package:http/http.dart';
 import 'package:provider/provider.dart';
 import 'package:sayibulmaca/Options.dart';
 import 'package:sayibulmaca/league_details.dart';
-
 import 'AuthenticationServices.dart';
 import 'Users.dart';
 import 'helpers.dart';
@@ -29,19 +31,26 @@ Future<List> loadLeagues(Users user, int currentPage) async {
     await FirebaseFirestore.instance.collection("Leagues").get().then((value) {
       value.docs.forEach((element) {
         Options options = Options(
+            accessMode: 'private',
             game: 'guess',
             multiplayer: true,
             duration: element.get('duration'),
             bestOf: element.get('bestOf'),
             increasingDiff: element.get('increasingDiff'),
             length: element.get('length'));
-        leagues.add(League(
+        League league = League(
             id: element.id,
             name: element.get('name'),
             host: element.get('host'),
             players: element.get('players'),
             options: options,
-            matchups: []));
+            matchups: []);
+        try {
+          league.matchups = jsonDecode(element.get('matchups'));
+        } catch (e) {
+          print(e);
+        }
+        leagues.add(league);
         if (element.get('players').contains(jsonEncode(user)))
           joinedLeagues.add(element.id);
       });
@@ -271,7 +280,7 @@ class ExplorePage extends State<ExplorePageSend> {
               },
               tabs: [
                 Tab(
-                  icon: Icon(Icons.find_in_page),
+                  icon: Icon(Icons.search),
                   text: 'searchUser'.tr(),
                 ),
                 Tab(
@@ -369,7 +378,7 @@ class ExplorePage extends State<ExplorePageSend> {
               )
             ],
           ),
-          body: TabBarView(children: [
+          body: TabBarView(physics: NeverScrollableScrollPhysics(), children: [
             SingleChildScrollView(
               child: Column(
                 children: [
@@ -379,14 +388,6 @@ class ExplorePage extends State<ExplorePageSend> {
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
                         children: [
-                          // IconButton(
-                          //     onPressed: () {
-                          //       launchUrl(
-                          //           Uri.parse(
-                          //               "https://fb.gg/me/friendfinder/682728652813701"),
-                          //           mode: LaunchMode.externalApplication);
-                          //     },
-                          //     icon: Icon(Icons.launch)),
                           TextField(
                               onEditingComplete: () async {
                                 await context
@@ -464,6 +465,13 @@ class ExplorePage extends State<ExplorePageSend> {
                                     .collection("Users")
                                     .doc(foundUsers[idx].email);
                                 return ListTile(
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                AccountPageSend(
+                                                    user: foundUsers[idx])));
+                                  },
                                   leading: Text(foundUsers[idx].name!),
                                   trailing: alreadyRequested
                                           .contains(foundUsers[idx].email)
@@ -518,6 +526,27 @@ class ExplorePage extends State<ExplorePageSend> {
                       ),
                     ),
                   ),
+//                   SignInButton(
+//                     Buttons.Facebook,
+//                     text: 'fbFriends'.tr(),
+//                     onPressed: () async {
+// //                     GraphRequest request = GraphRequest.newGraphPathRequest(
+// //   accessToken,
+// //   "/{user-id}/friends",
+// //   new GraphRequest.Callback() {
+// //     @Override
+// //     public void onCompleted(GraphResponse response) {
+// //       // Insert your code here
+// //     }
+// // });
+// // request.executeAsync();
+//                       Response r = await get(Uri.parse(
+//                           'https://graph.facebook.com/v14.0/' +
+//                               '100081462864548' +
+//                               '/friends'));
+//                       print(r.body);
+//                     },
+//                   ),
                 ],
               ),
             ),
@@ -565,117 +594,132 @@ class ExplorePage extends State<ExplorePageSend> {
               },
             )
           ]),
-          floatingActionButton: currentPage == 2
-              ? FloatingActionButton.extended(
-                  label: Text('createLeague'.tr()),
-                  icon: Icon(Icons.add),
-                  onPressed: () async {
-                    DateTime? date;
-                    showDialog(
-                        barrierDismissible: false,
-                        context: context,
-                        builder: (context) {
-                          return AlertDialog(
-                            actionsAlignment: MainAxisAlignment.center,
-                            title: Text(
-                              'createLeague'.tr(),
-                              textAlign: TextAlign.center,
-                            ),
-                            content: SingleChildScrollView(
-                              child: Column(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  TextField(
-                                    controller: tecName,
-                                    textAlign: TextAlign.center,
-                                    decoration: InputDecoration(
-                                        labelText: 'name'.tr(),
-                                        border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10))),
+          floatingActionButton: (user!.method == 'facebook' && currentPage == 0)
+              ? SignInButton(
+                  Buttons.Facebook,
+                  onPressed: () {
+                    launchUrl(
+                        Uri.parse(
+                            "https://graph.facebook.com/v14.0//116284581096970/friends?access_token=" +
+                                this.user!.accessToken!),
+                        mode: LaunchMode.externalApplication);
+                  },
+                  mini: true,
+                )
+              : currentPage == 2
+                  ? FloatingActionButton.extended(
+                      label: Text('createLeague'.tr()),
+                      icon: Icon(Icons.add),
+                      onPressed: () async {
+                        DateTime? date;
+                        showDialog(
+                            barrierDismissible: false,
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                actionsAlignment: MainAxisAlignment.center,
+                                title: Text(
+                                  'createLeague'.tr(),
+                                  textAlign: TextAlign.center,
+                                ),
+                                content: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      TextField(
+                                        controller: tecName,
+                                        textAlign: TextAlign.center,
+                                        decoration: InputDecoration(
+                                            labelText: 'name'.tr(),
+                                            border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10))),
+                                      ),
+                                      TextField(
+                                        controller: tecEndDate,
+                                        onTap: () async {
+                                          date = await showDatePicker(
+                                                  context: context,
+                                                  initialDate: DateTime.now(),
+                                                  firstDate: DateTime.now(),
+                                                  lastDate: DateTime(
+                                                      DateTime.now().year +
+                                                          1)) ??
+                                              date;
+                                          tecEndDate.text = date == null
+                                              ? ''
+                                              : DateFormat('yyyy/MM/dd')
+                                                  .format(date!);
+                                        },
+                                        textAlign: TextAlign.center,
+                                        decoration: InputDecoration(
+                                            labelText: 'duration'.tr(),
+                                            border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10))),
+                                      ),
+                                      ElevatedButton.icon(
+                                          icon: Icon(Icons.settings),
+                                          label: Text('settings'.tr()),
+                                          onPressed: () async {
+                                            options = await popupOptions(
+                                                context, options, '');
+                                          }),
+                                    ],
                                   ),
-                                  TextField(
-                                    controller: tecEndDate,
-                                    onTap: () async {
-                                      date = await showDatePicker(
-                                              context: context,
-                                              initialDate: DateTime.now(),
-                                              firstDate: DateTime.now(),
-                                              lastDate: DateTime(
-                                                  DateTime.now().year + 1)) ??
-                                          date;
-                                      tecEndDate.text = date == null
-                                          ? ''
-                                          : DateFormat('yyyy/MM/dd')
-                                              .format(date!);
-                                    },
-                                    textAlign: TextAlign.center,
-                                    decoration: InputDecoration(
-                                        labelText: 'duration'.tr(),
-                                        border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10))),
-                                  ),
-                                  ElevatedButton.icon(
-                                      icon: Icon(Icons.settings),
-                                      label: Text('settings'.tr()),
-                                      onPressed: () async {
-                                        options = await popupOptions(
-                                            context, options, '');
-                                      }),
-                                ],
-                              ),
-                            ),
-                            actions: [
-                              ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: Text('back'.tr())),
-                              ElevatedButton(
-                                  onPressed: () async {
-                                    if (tecName.text != '') {
-                                      if (!await exists(
-                                          tecName.text, 'Leagues', 'name')) {
-                                        await FirebaseFirestore.instance
-                                            .collection('Leagues')
-                                            .doc()
-                                            .set({
-                                          'name': tecName.text,
-                                          'host': this.user?.email,
-                                          'players': List.filled(
-                                              1, jsonEncode(this.user)),
-                                          'length': options.length,
-                                          'duration': options.duration,
-                                          'endDate': tecEndDate.text,
-                                          'bestOf': options.bestOf,
-                                          'increasingDiff':
-                                              options.increasingDiff
-                                        });
-                                        ScaffoldMessenger.maybeOf(context)
-                                            ?.showSnackBar(SnackBar(
-                                                content: Text(tecName.text +
-                                                    ' ' +
-                                                    'leagueCreated'.tr())));
+                                ),
+                                actions: [
+                                  ElevatedButton(
+                                      onPressed: () {
                                         Navigator.pop(context);
-                                        setState(() {});
-                                      } else
-                                        ScaffoldMessenger.maybeOf(context)
-                                            ?.showSnackBar(SnackBar(
-                                                content: Text(
-                                                    'alertExistsLeague'.tr())));
-                                    } else
-                                      ScaffoldMessenger.maybeOf(context)
-                                          ?.showSnackBar(SnackBar(
-                                              content: Text('alertFill'.tr())));
-                                  },
-                                  child: Text('create'.tr()))
-                            ],
-                          );
-                        });
-                  })
-              : null,
+                                      },
+                                      child: Text('back'.tr())),
+                                  ElevatedButton(
+                                      onPressed: () async {
+                                        if (tecName.text != '') {
+                                          if (!await exists(tecName.text,
+                                              'Leagues', 'name')) {
+                                            await FirebaseFirestore.instance
+                                                .collection('Leagues')
+                                                .doc()
+                                                .set({
+                                              'name': tecName.text,
+                                              'host': this.user?.email,
+                                              'players': List.filled(
+                                                  1, jsonEncode(this.user)),
+                                              'length': options.length,
+                                              'duration': options.duration,
+                                              'endDate': tecEndDate.text,
+                                              'bestOf': options.bestOf,
+                                              'increasingDiff':
+                                                  options.increasingDiff
+                                            });
+                                            ScaffoldMessenger.maybeOf(context)
+                                                ?.showSnackBar(SnackBar(
+                                                    content: Text(tecName.text +
+                                                        ' ' +
+                                                        'leagueCreated'.tr())));
+                                            Navigator.pop(context);
+                                            setState(() {});
+                                          } else
+                                            ScaffoldMessenger.maybeOf(context)
+                                                ?.showSnackBar(SnackBar(
+                                                    content: Text(
+                                                        'alertExistsLeague'
+                                                            .tr())));
+                                        } else
+                                          ScaffoldMessenger.maybeOf(context)
+                                              ?.showSnackBar(SnackBar(
+                                                  content:
+                                                      Text('alertFill'.tr())));
+                                      },
+                                      child: Text('create'.tr()))
+                                ],
+                              );
+                            });
+                      })
+                  : null,
         ),
       ),
     );

@@ -111,7 +111,7 @@ class AccountSettingsPage extends State<AccountSettingsPageSend> {
                                     else
                                       await context
                                           .read<AuthenticationServices>()
-                                          .deleteProvider(this.user!.method!);
+                                          .deleteProvider();
                                     signedOut = true;
                                     Navigator.of(context).push(
                                         MaterialPageRoute(

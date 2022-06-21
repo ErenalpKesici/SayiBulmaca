@@ -43,8 +43,11 @@ class LeaguePage extends State<LeaguePageSend> {
               shrinkWrap: true,
               itemCount: league!.matchups.length,
               itemBuilder: (context, idx) {
+                league!.matchups
+                    .sort((a, b) => a['scores'][0].compareTo(b['scores'][0]));
                 List players = league!.matchups[idx]['players'];
-                players = decodeList(players);
+                List scores = league!.matchups[idx]['scores'];
+                players = [jsonDecode(players.first), jsonDecode(players.last)];
                 return Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Card(
@@ -52,22 +55,31 @@ class LeaguePage extends State<LeaguePageSend> {
                     child: ListTile(
                       title: Text(
                           players[0]['name'] + ' vs ' + players[1]['name']),
-                      trailing: players.any(
-                              (element) => element['email'] == this.user!.email)
-                          ? ElevatedButton.icon(
-                              onPressed: () async {
-                                await pushInvite(
-                                    this.user!,
-                                    players.firstWhere((element) =>
-                                        element['email'] !=
-                                        this.user!.email)['email'],
-                                    'league');
-                                await startGame(context, this.user!,
-                                    league!.options!, null, 'league');
-                              },
-                              icon: Icon(Icons.play_arrow_sharp),
-                              label: Text('start'.tr()))
-                          : null,
+                      trailing:
+                          scores.every((element) => int.parse(element) > -1)
+                              ? Text(scores.toString())
+                              : players.any((element) =>
+                                      element['email'] == this.user!.email)
+                                  ? ElevatedButton.icon(
+                                      onPressed: () async {
+                                        int matchIdx = players.indexWhere(
+                                            (element) =>
+                                                element['email'] !=
+                                                this.user!.email);
+                                        await pushInvite(this.user!,
+                                            players[matchIdx]['email'], {
+                                          'leagueId': league!.id,
+                                          'matchIdx': idx
+                                        });
+                                        await startGame(context, this.user!,
+                                            league!.options!, null, {
+                                          'leagueId': league!.id,
+                                          'matchupIdx': idx.toString()
+                                        });
+                                      },
+                                      icon: Icon(Icons.play_arrow_sharp),
+                                      label: Text('start'.tr()))
+                                  : null,
                     ),
                   ),
                 );

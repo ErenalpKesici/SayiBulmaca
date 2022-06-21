@@ -111,76 +111,9 @@ class SettingsPage extends State<SettingsPageSend> {
               },
               controlAffinity: ListTileControlAffinity.trailing,
             ),
-            CheckboxListTile(
-                title: Text('showInvite'.tr()),
-                value: prefs?.getBool('scanInvite') ?? true,
-                onChanged: (val) {
-                  setState(() {
-                    prefs?.setBool('scanInvite', val!);
-                  });
-                  if (prefs?.getBool('scanInvite') == true)
-                    scanInvites(this.user, context);
-                  print(prefs?.getBool('scanInvite'));
-                }),
           ],
         ),
       ),
     );
-  }
-}
-
-void scanInvites(Users? user, BuildContext context) async {
-  if (currentlyScanning == false) {
-    currentlyScanning = true;
-    Timer.periodic(Duration(seconds: 5), (timer) async {
-      if (signedOut == true ||
-          prefs?.getBool('scanInvite') == null ||
-          prefs?.getBool('scanInvite') == false) {
-        currentlyScanning = false;
-        timer.cancel();
-        return;
-      }
-      DocumentReference? docRef;
-      try {
-        docRef =
-            FirebaseFirestore.instance.collection("Users").doc(user!.email!);
-      } catch (e) {
-        timer.cancel();
-      }
-      var doc = await docRef!.get();
-      try {
-        List invites = doc.get('invite');
-        if (invites.isNotEmpty) {
-          String invite = invites.removeLast();
-          FirebaseFirestore.instance
-              .collection("Users")
-              .doc(user!.email!)
-              .update({'invite': invites});
-          showDialog(
-              context: context,
-              builder: (context) {
-                return AlertDialog(
-                  title: Text('incomingInvite'.tr()),
-                  content: Text(invite),
-                  actions: [
-                    Center(
-                      child: ElevatedButton.icon(
-                          onPressed: () async {
-                            DocumentReference ref = FirebaseFirestore.instance
-                                .collection('Rooms')
-                                .doc(invite);
-                            var doc = await ref.get();
-                            List players = doc.get('players');
-                            joinDialog(context, invite, players, user);
-                          },
-                          icon: Icon(Icons.check_circle),
-                          label: Text('join'.tr())),
-                    )
-                  ],
-                );
-              });
-        }
-      } catch (e) {}
-    });
   }
 }
