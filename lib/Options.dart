@@ -10,7 +10,7 @@ class Options {
       required this.duration,
       required this.bestOf,
       required this.increasingDiff,
-      required length});
+      required this.length});
   Options.fromJson(Map<String, dynamic> json)
       : accessMode = json['accessMode'],
         game = json['game'],

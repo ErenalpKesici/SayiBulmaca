@@ -43,8 +43,8 @@ class LeaguePage extends State<LeaguePageSend> {
               shrinkWrap: true,
               itemCount: league!.matchups.length,
               itemBuilder: (context, idx) {
-                league!.matchups
-                    .sort((a, b) => a['scores'][0].compareTo(b['scores'][0]));
+                // league!.matchups
+                //     .sort((a, b) => a['scores'][0].compareTo(b['scores'][0]));
                 List players = league!.matchups[idx]['players'];
                 List scores = league!.matchups[idx]['scores'];
                 players = [jsonDecode(players.first), jsonDecode(players.last)];

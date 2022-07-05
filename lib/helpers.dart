@@ -10,6 +10,19 @@ import 'package:http/http.dart';
 import 'Users.dart';
 import 'main.dart';
 
+// Container getGradient(BuildContext context) {
+//   return Container(
+//     decoration: BoxDecoration(
+//         gradient: LinearGradient(
+//             begin: Alignment.topLeft,
+//             end: Alignment.bottomRight,
+//             colors: <Color>[
+//           Theme.of(context).primaryColor,
+//           Theme.of(context).hintColor
+//         ])),
+//   );
+// }
+
 Future getField(String collection, String doc, String field) async {
   DocumentReference docUser =
       FirebaseFirestore.instance.collection(collection).doc(doc);
@@ -44,7 +57,7 @@ List<BottomNavigationBarItem> bottomNavItems() {
 
 Future<Options> popupOptions(
     BuildContext context, Options options, String idIfExists) async {
-  showDialog(
+  await showDialog(
       context: context,
       builder: (context) {
         var durationEnabled;

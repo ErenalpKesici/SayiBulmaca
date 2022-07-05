@@ -130,9 +130,10 @@ class MyApp extends StatelessWidget {
           title: 'Sayi Bulmaca',
           theme: ThemeData(
             brightness: SchedulerBinding.instance.window.platformBrightness,
-            appBarTheme: AppBarTheme(backgroundColor: Colors.pink),
+            appBarTheme:
+                AppBarTheme(backgroundColor: Color.fromARGB(255, 165, 8, 60)),
             bottomNavigationBarTheme: BottomNavigationBarThemeData(
-                backgroundColor: Colors.pink,
+                backgroundColor: Color.fromARGB(255, 165, 8, 60),
                 selectedItemColor: Colors.tealAccent,
                 unselectedItemColor: Colors.white),
             primarySwatch: Colors.pink,
@@ -812,6 +813,7 @@ class SearchPage extends State<SearchPageSend> {
               return;
             }
             if (status == 'playing') {
+              print(btn.toString());
               Navigator.of(context).push(MaterialPageRoute(
                   builder: (context) => GamePageSend(
                       user,
@@ -2101,21 +2103,26 @@ class GamePage extends State<GamePageSend> {
         FirebaseFirestore.instance.collection("Rooms").doc(this.room);
     var document = await doc.get();
     if (!document.exists) return;
-    bool inserted = false;
-    inserted = document.get('roundInserted');
+    bool inserted = document.get('roundInserted');
     var scores = document.get('scores');
     if (!inserted) {
+      await FirebaseFirestore.instance
+          .collection("Rooms")
+          .doc(this.room)
+          .update({
+        'roundInserted': true,
+      });
       roundCounter = scores.first.split('-').length;
       bool increasingDiff = document.get('increasingDiff');
       if (roundCounter != 1 && increasingDiff) options?.length++;
       for (int i = 0; i < scores.length; i++) {
         scores[i] += '-';
       }
+
       await FirebaseFirestore.instance
           .collection("Rooms")
           .doc(this.room)
           .update({
-        'roundInserted': true,
         'length': options?.length,
         'number': findRandom(options?.length),
         'scores': scores
@@ -2492,6 +2499,20 @@ class GamePage extends State<GamePageSend> {
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(0, 12, 0, 0),
                     child: DataTable(
+                      dataTextStyle: TextStyle(
+                        shadows: <Shadow>[
+                          Shadow(
+                            offset: Offset(3, 1),
+                            blurRadius: 10.0,
+                            color: Colors.black,
+                          ),
+                          Shadow(
+                            offset: Offset(1, 2),
+                            blurRadius: 2.0,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
                       columnSpacing: 40,
                       headingRowColor: MaterialStateColor.resolveWith(
                           (states) => Colors.black12),
@@ -2505,9 +2526,12 @@ class GamePage extends State<GamePageSend> {
                       rows: entryList
                           .map<DataRow>((e) => DataRow(
                                   color: MaterialStateColor.resolveWith(
-                                      (states) => e.kazandi
-                                          ? Colors.green
-                                          : Colors.grey),
+                                      (states) => Color.fromARGB(
+                                          255,
+                                          180,
+                                          (e.dogru / e.tahmin.length * 255)
+                                              .toInt(),
+                                          60)),
                                   cells: [
                                     DataCell(Text(e.id.toString())),
                                     DataCell(Text(e.tahmin)),

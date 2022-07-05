@@ -44,12 +44,24 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
     return _min - length;
   }
 
-  Future<void> saveLeague() async {}
+  int _calculateScore(int userIdx) {
+    int score = 0;
+    league?.matchups.forEach((match) {
+      for (int i = 0; i < match['players'].length; i++) {
+        if (league!.players[userIdx] == match['players'][i] &&
+            int.parse(match['scores'][i]) > 0) {
+          score += int.parse(match['scores'][i]);
+        }
+      }
+    });
+    return score;
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        loadLeagues(this.user!, 2);
+        loadLeagues(this.user!, 1);
         return true;
       },
       child: Scaffold(
@@ -73,6 +85,7 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
                   itemCount: league!.players.length,
                   itemBuilder: (context, idx) {
                     var user = jsonDecode(league!.players[idx]);
+                    ;
                     return ListTile(
                       leading: Container(
                           width: 25,
@@ -83,25 +96,27 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
                                 )
                               : null),
                       title: Text(user['name']),
-                      trailing: user['email'] == league!.host
-                          ? Icon(Icons.account_tree_rounded)
-                          : league!.host == this.user!.email &&
-                                  user['email'] != this.user!.email
-                              ? ElevatedButton.icon(
-                                  onPressed: () async {
-                                    league!.players = await removeFrom(
-                                        user['email'],
-                                        'Leagues',
-                                        league!.id!,
-                                        'players');
-                                    setState(() {
-                                      _required = _closestPowerOfTwo(
-                                          league!.players.length);
-                                    });
-                                  },
-                                  icon: Icon(Icons.block),
-                                  label: Text('kickOut'.tr()))
-                              : null,
+                      trailing: league!.matchups.isEmpty
+                          ? user['email'] == league!.host
+                              ? Icon(Icons.account_tree_rounded)
+                              : league!.host == this.user!.email &&
+                                      user['email'] != this.user!.email
+                                  ? ElevatedButton.icon(
+                                      onPressed: () async {
+                                        league!.players = await removeFrom(
+                                            user['email'],
+                                            'Leagues',
+                                            league!.id!,
+                                            'players');
+                                        setState(() {
+                                          _required = _closestPowerOfTwo(
+                                              league!.players.length);
+                                        });
+                                      },
+                                      icon: Icon(Icons.block),
+                                      label: Text('kickOut'.tr()))
+                                  : null
+                          : Text(_calculateScore(idx).toString()),
                     );
                   }),
               league!.host == user!.email
@@ -143,6 +158,7 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
                                       ]));
                                     }
                                   }
+
                                   await FirebaseFirestore.instance
                                       .collection("Leagues")
                                       .doc(this.league!.id)
