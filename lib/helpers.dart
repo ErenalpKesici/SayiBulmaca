@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:confetti/confetti.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:sayibulmaca/Options.dart';
 
 import 'package:http/http.dart';
+import 'package:sayibulmaca/league.dart';
 import 'Users.dart';
 import 'main.dart';
 
@@ -423,7 +425,7 @@ Future<void> startGame(BuildContext context, Users user, Options options,
                                         'matchups'));
                                     matchups[int.parse(
                                             ifLeagueInfo['matchupIdx'])]
-                                        ['scores'] = List.filled(2, '0');
+                                        ['scores'] = List.filled(2, '-1');
                                     await FirebaseFirestore.instance
                                         .collection('Leagues')
                                         .doc(ifLeagueInfo['leagueId'])
@@ -473,4 +475,38 @@ void _nameFromMail(mail) async {
       FirebaseFirestore.instance.collection('Rooms').doc(mail);
   var doc = await ref.get();
   return doc.get('name');
+}
+
+Future<void> alertLeagueOver(BuildContext context, Users user, league) async {
+  confettiController.play();
+  prefs?.setBool('leagueAlerted' + league.id, true);
+  return await showDialog(
+      context: context,
+      builder: (context) {
+        int place = -1;
+        String player = '';
+        league.results.forEach((result) {
+          if (jsonDecode(result['player'])['email'] == user.email) {
+            player = jsonDecode(result['player'])['name'];
+            place = result['num'];
+          }
+        });
+        return AlertDialog(
+          title: Text('Con ' + player + " you placed " + place.toString()),
+        );
+      });
+}
+
+void setLeagueStatus(leagueId, players) async {
+  DocumentReference documentReference =
+      FirebaseFirestore.instance.collection("Leagues").doc(leagueId);
+  var doc = await documentReference.get();
+  if (doc.get('status') != -1) {
+    List matches = jsonDecode(doc.get('matchups'));
+    if (matches.every((match) => match['scores'][0] != '-1'))
+      FirebaseFirestore.instance
+          .collection("Leagues")
+          .doc(leagueId)
+          .update({'status': -1, 'results': players});
+  }
 }

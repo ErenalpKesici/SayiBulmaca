@@ -119,8 +119,10 @@
     "createLeague": "Create a league",
     "leagueCreated": "League has been created",
     "toolTipPlayers": "more players are required",
+    "joinedLeague": "Joined League",
     "leagueStarted": "Ongoing League",
     "matchups": "Matchups",
+    "standings": "Standings",
     "public": "Public",
     "private": "Private"
 }

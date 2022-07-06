@@ -158,12 +158,13 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
                                       ]));
                                     }
                                   }
-
                                   await FirebaseFirestore.instance
                                       .collection("Leagues")
                                       .doc(this.league!.id)
-                                      .update(
-                                          {'matchups': jsonEncode(matchups)});
+                                      .update({
+                                    'matchups': jsonEncode(matchups),
+                                    'status': 1
+                                  });
                                   league?.matchups = matchups;
                                   Navigator.of(context).push(MaterialPageRoute(
                                       builder: (context) =>

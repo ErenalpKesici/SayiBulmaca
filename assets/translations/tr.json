@@ -116,8 +116,10 @@
     "createLeague": "Lig Oluştur",
     "leagueCreated": "Lig oluşturuldu",
     "toolTipPlayers": "oyuncu daha gerekiyor",
-    "leagueStarted": "Başlayan Lig",
+    "joinedLeague": "Katılınan Lig",
+    "leagueStarted": "Başlıyan Lig",
     "matchups": "Maçlar",
+    "standings": "Puan Durumu",
     "public": "Açık",
     "private": "Özel"
 }

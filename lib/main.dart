@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'package:confetti/confetti.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -41,6 +42,8 @@ String systemLanguage = Platform.localeName.split('_')[0];
 SharedPreferences? prefs;
 bool currentlyScanning = false, signedOut = false;
 String defaultPicture = 'assets/imgs/account.png';
+ConfettiController confettiController =
+    ConfettiController(duration: Duration(seconds: 2));
 Future<Users> findUser(email) async {
   DocumentReference doc =
       FirebaseFirestore.instance.collection("Users").doc(email);
@@ -771,12 +774,14 @@ class SearchPage extends State<SearchPageSend> {
   Timer? searchTimer;
   int selectedIdx = 0;
   Matchup? matchup;
+  Future? _fLeague;
   SearchPage(this.user);
   @override
   void initState() {
     checkNetwork(context);
     pushInviteReceived();
     super.initState();
+    _fLeague = searchLeagueStarted();
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (EasyLocalization.of(context)!.locale != Locale(this.user!.language!))
         EasyLocalization.of(context)!.setLocale(Locale(this.user!.language!));
@@ -869,190 +874,226 @@ class SearchPage extends State<SearchPageSend> {
   }
 
   Future searchLeagueStarted() async {
-    var ret;
+    List leaguesFound = List.empty(growable: true);
     try {
       await FirebaseFirestore.instance
           .collection('Leagues')
           .get()
           .then((value) => value.docs.forEach((element) {
-                jsonDecode(element.get('matchups')).forEach((match) {
-                  List players = match['players'];
-                  if (players.any((element) =>
-                      jsonDecode(element)['email'] == this.user!.email)) {
-                    var league = element.data();
-                    ret = {
-                      'league': League(
-                          host: league['host'],
-                          id: element.id,
-                          name: league['name'],
-                          options: Options(
-                              accessMode: 'private',
-                              bestOf: league['bestOf'],
-                              duration: league['duration'],
-                              game: '',
-                              increasingDiff: league['increasingDiff'],
-                              length: league['length'],
-                              multiplayer: true),
-                          players: league['players'],
-                          matchups: jsonDecode(league['matchups'])),
-                      'matchup': Matchup(
-                          players: match['players'], scores: match['scores'])
-                    };
+                if (element.get('status') != 0) {
+                  List matches = jsonDecode(element.get('matchups'));
+                  for (int i = 0; i < matches.length; i++) {
+                    List players = matches[i]['players'];
+                    if (players.any((element) =>
+                        jsonDecode(element)['email'] == this.user!.email)) {
+                      var league = element.data();
+                      leaguesFound.add({
+                        'league': League(
+                            host: league['host'],
+                            status: league['status'],
+                            results: league['results'],
+                            id: element.id,
+                            name: league['name'],
+                            startDate: DateTime.parse(element.get('startDate')),
+                            endDate: element.get('endDate') == ''
+                                ? null
+                                : DateTime.parse(element.get('endDate')),
+                            options: Options(
+                                accessMode: 'private',
+                                bestOf: league['bestOf'],
+                                duration: league['duration'],
+                                game: '',
+                                increasingDiff: league['increasingDiff'],
+                                length: league['length'],
+                                multiplayer: true),
+                            players: league['players'],
+                            matchups: jsonDecode(league['matchups'])),
+                        'matchup': Matchup(
+                            players: matches[i]['players'],
+                            scores: matches[i]['scores'])
+                      });
+                      break;
+                    }
                   }
-                });
+                }
               }));
     } catch (e) {
       print(e);
     }
-    return ret;
+    List startDates = List.empty(growable: true);
+    leaguesFound.forEach((element) {
+      startDates.add(element['league'].startDate);
+    });
+    startDates.sort((a, b) => a.compareTo(b));
+    var league = leaguesFound[leaguesFound.indexWhere(
+        (element) => element['league'].startDate == startDates.first)];
+    return league;
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        return logout(context);
-      },
-      child: Scaffold(
-        bottomNavigationBar: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          items: bottomNavItems(),
-          currentIndex: selectedBottomIdx,
-          onTap: (int tappedIdx) {
-            if (selectedBottomIdx == tappedIdx) return;
-            setState(() {
-              selectedBottomIdx = tappedIdx;
-            });
-            navigateBottom(context, this.user!);
-          },
-        ),
-        resizeToAvoidBottomInset: false,
-        appBar: AppBar(
-          title: Text('title'.tr().toString()),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => IntroductionPageSend()));
-              },
-              icon: Icon(Icons.help),
-            ),
-          ],
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FittedBox(
-                child: ElevatedButton.icon(
-                    onPressed: () async {
-                      bool searching = false;
-                      var foundRoom, currentPlayers;
-                      searchTimer = Timer.periodic(new Duration(seconds: 1),
-                          (timer) async {
-                        await FirebaseFirestore.instance
-                            .collection("Rooms")
-                            .get()
-                            .then((value) {
-                          value.docs.forEach((result) {
-                            if (result.get('accessMode') == 'public' &&
-                                result.get('status') == 'ready') {
-                              timer.cancel();
-                              foundRoom = result.id;
-                              currentPlayers = result.get('players');
-                            }
+    return ConfettiWidget(
+      confettiController: confettiController,
+      numberOfParticles: 100,
+      blastDirection: 90,
+      blastDirectionality: BlastDirectionality.explosive,
+      child: WillPopScope(
+        onWillPop: () async {
+          return logout(context);
+        },
+        child: Scaffold(
+          bottomNavigationBar: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            items: bottomNavItems(),
+            currentIndex: selectedBottomIdx,
+            onTap: (int tappedIdx) {
+              if (selectedBottomIdx == tappedIdx) return;
+              setState(() {
+                selectedBottomIdx = tappedIdx;
+              });
+              navigateBottom(context, this.user!);
+            },
+          ),
+          resizeToAvoidBottomInset: false,
+          appBar: AppBar(
+            title: Text('title'.tr().toString()),
+            centerTitle: true,
+            actions: [
+              IconButton(
+                onPressed: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => IntroductionPageSend()));
+                },
+                icon: Icon(Icons.help),
+              ),
+            ],
+          ),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FittedBox(
+                  child: ElevatedButton.icon(
+                      onPressed: () async {
+                        bool searching = false;
+                        var foundRoom, currentPlayers;
+                        searchTimer = Timer.periodic(new Duration(seconds: 1),
+                            (timer) async {
+                          await FirebaseFirestore.instance
+                              .collection("Rooms")
+                              .get()
+                              .then((value) {
+                            value.docs.forEach((result) {
+                              if (result.get('accessMode') == 'public' &&
+                                  result.get('status') == 'ready') {
+                                timer.cancel();
+                                foundRoom = result.id;
+                                currentPlayers = result.get('players');
+                              }
+                            });
                           });
-                        });
-                        if (foundRoom != null)
-                          joinDialog(
-                              context, foundRoom, currentPlayers, this.user!);
-                        else if (!searching) {
-                          searching = true;
-                          showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (BuildContext context) {
-                                return StatefulBuilder(
-                                    builder: (context, setState) {
-                                  return AlertDialog(
-                                    title: Center(
-                                        child: Text(
-                                      "search".tr().toString(),
-                                    )),
-                                    content: Container(
-                                      height: 125,
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          LinearProgressIndicator(),
-                                        ],
+                          if (foundRoom != null)
+                            joinDialog(
+                                context, foundRoom, currentPlayers, this.user!);
+                          else if (!searching) {
+                            searching = true;
+                            showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (BuildContext context) {
+                                  return StatefulBuilder(
+                                      builder: (context, setState) {
+                                    return AlertDialog(
+                                      title: Center(
+                                          child: Text(
+                                        "search".tr().toString(),
+                                      )),
+                                      content: Container(
+                                        height: 125,
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            LinearProgressIndicator(),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    actions: [
-                                      ElevatedButton(
-                                          onPressed: () async {
-                                            searchTimer?.cancel();
-                                            Navigator.pop(context);
-                                          },
-                                          child: Center(
-                                              child: Text(
-                                                  'abort'.tr().toString()))),
-                                    ],
-                                  );
+                                      actions: [
+                                        ElevatedButton(
+                                            onPressed: () async {
+                                              searchTimer?.cancel();
+                                              Navigator.pop(context);
+                                            },
+                                            child: Center(
+                                                child: Text(
+                                                    'abort'.tr().toString()))),
+                                      ],
+                                    );
+                                  });
                                 });
-                              });
-                        }
-                      });
+                          }
+                        });
+                      },
+                      style:
+                          ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
+                      icon: Icon(Icons.speed_rounded),
+                      label: Text('gameQuickJoin'.tr(),
+                          style: TextStyle(fontSize: 30))),
+                ),
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * .1,
+                ),
+                ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => JoinGamePageSend(
+                                user: this.user,
+                              )));
                     },
                     style:
                         ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                    icon: Icon(Icons.speed_rounded),
-                    label: Text('gameQuickJoin'.tr(),
+                    icon: Icon(Icons.list),
+                    label: Text('gameList'.tr().toString(),
                         style: TextStyle(fontSize: 30))),
-              ),
-              SizedBox(
-                height: MediaQuery.of(context).size.height * .1,
-              ),
-              ElevatedButton.icon(
-                  onPressed: () async {
-                    Navigator.of(context).push(MaterialPageRoute(
-                        builder: (context) => JoinGamePageSend(
-                              user: this.user,
-                            )));
-                  },
-                  style: ElevatedButton.styleFrom(padding: EdgeInsets.all(16)),
-                  icon: Icon(Icons.list),
-                  label: Text('gameList'.tr().toString(),
-                      style: TextStyle(fontSize: 30))),
-              FutureBuilder(
-                  future: searchLeagueStarted(),
-                  builder:
-                      (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-                    if (snapshot.hasData)
-                      return Column(
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * .1,
-                          ),
-                          ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(MaterialPageRoute(
-                                    builder: (context) => LeaguePageSend(
-                                        user: this.user,
-                                        league: snapshot.data['league'])));
-                              },
-                              style: ElevatedButton.styleFrom(
-                                  padding: EdgeInsets.all(16)),
-                              icon: Icon(Icons.leaderboard),
-                              label: Text('leagueStarted'.tr(),
-                                  style: TextStyle(fontSize: 30))),
-                        ],
-                      );
-                    return SizedBox.shrink();
-                  })
-            ],
+                FutureBuilder(
+                    future: _fLeague,
+                    builder: (BuildContext context,
+                        AsyncSnapshot<dynamic> snapshot) {
+                      if (snapshot.hasData) {
+                        SchedulerBinding.instance.addPostFrameCallback((_) {
+                          bool? alreadyAlerted = prefs?.getBool(
+                              'leagueAlerted' + snapshot.data['league'].id);
+                          if (snapshot.data['league'].status == -1 &&
+                                  alreadyAlerted == null ||
+                              alreadyAlerted == false) {
+                            alertLeagueOver(
+                                context, this.user!, snapshot.data['league']);
+                          }
+                        });
+                        return Column(
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * .1,
+                            ),
+                            ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                      builder: (context) => LeaguePageSend(
+                                          user: this.user,
+                                          league: snapshot.data['league'])));
+                                },
+                                style: ElevatedButton.styleFrom(
+                                    padding: EdgeInsets.all(16)),
+                                icon: Icon(Icons.leaderboard),
+                                label: Text('joinedLeague'.tr(),
+                                    style: TextStyle(fontSize: 30))),
+                          ],
+                        );
+                      }
+                      return SizedBox.shrink();
+                    })
+              ],
+            ),
           ),
         ),
       ),
@@ -1833,7 +1874,11 @@ class GamePage extends State<GamePageSend> {
     DocumentReference docs =
         FirebaseFirestore.instance.collection('Rooms').doc(this.room);
     var document = await docs.get();
-    randomNumber = document.get('number');
+    try {
+      randomNumber = document.get('number');
+    } catch (e) {
+      initializeNumber();
+    }
     _lblText =
         randomNumber.toString().length.toString() + ' ' + 'digit'.tr() + ': ';
   }
@@ -2118,7 +2163,6 @@ class GamePage extends State<GamePageSend> {
       for (int i = 0; i < scores.length; i++) {
         scores[i] += '-';
       }
-
       await FirebaseFirestore.instance
           .collection("Rooms")
           .doc(this.room)

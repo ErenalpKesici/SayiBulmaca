@@ -41,16 +41,20 @@ Future<List> loadLeagues(Users user, int currentPage) async {
             length: element.get('length'));
         League league = League(
             id: element.id,
+            results: element.get('results'),
             name: element.get('name'),
+            startDate: DateTime.parse(element.get('startDate')),
+            endDate: element.get('endDate') != ''
+                ? DateTime.parse(element.get('endDate'))
+                : null,
             host: element.get('host'),
+            status: element.get('status'),
             players: element.get('players'),
             options: options,
             matchups: []);
         try {
           league.matchups = jsonDecode(element.get('matchups'));
-        } catch (e) {
-          print(e);
-        }
+        } catch (e) {}
         leagues.add(league);
         if (element.get('players').contains(jsonEncode(user)))
           joinedLeagues.add(element.id);
@@ -184,7 +188,7 @@ class ExplorePage extends State<ExplorePageSend> {
                 ' ' +
                 'players'.tr()),
             trailing: snapshot.data[index].matchups.isNotEmpty
-                ? Text("leagueStarted".tr())
+                ? Text("joinedLeague".tr())
                 : snapshot.data[index].host == this.user!.email
                     ? ElevatedButton.icon(
                         onPressed: () async {
@@ -653,7 +657,7 @@ class ExplorePage extends State<ExplorePageSend> {
                                               date;
                                           tecEndDate.text = date == null
                                               ? ''
-                                              : DateFormat('yyyy/MM/dd')
+                                              : DateFormat('yyyy-MM-dd')
                                                   .format(date!);
                                         },
                                         textAlign: TextAlign.center,
@@ -690,11 +694,16 @@ class ExplorePage extends State<ExplorePageSend> {
                                                 .set({
                                               'name': tecName.text,
                                               'host': this.user?.email,
+                                              'startDate':
+                                                  DateFormat('yyyy-MM-dd')
+                                                      .format(DateTime.now()),
+                                              'endDate': tecEndDate.text,
+                                              'results': List.empty(),
+                                              'status': 0,
                                               'players': List.filled(
                                                   1, jsonEncode(this.user)),
                                               'length': options.length,
                                               'duration': options.duration,
-                                              'endDate': tecEndDate.text,
                                               'bestOf': options.bestOf,
                                               'increasingDiff':
                                                   options.increasingDiff
