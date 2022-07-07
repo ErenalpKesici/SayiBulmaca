@@ -48,6 +48,7 @@ dependencies:
   intl: ^0.17.0
   onesignal_flutter: ^3.3.0
   confetti: ^0.7.0
+  share_plus: ^4.0.10
   get:
   get_storage:
   # The following adds the Cupertino Icons font to your application.

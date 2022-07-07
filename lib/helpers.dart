@@ -10,6 +10,7 @@ import 'package:sayibulmaca/Options.dart';
 import 'package:http/http.dart';
 import 'package:sayibulmaca/league.dart';
 import 'Users.dart';
+import 'package:share_plus/share_plus.dart';
 import 'main.dart';
 
 // Container getGradient(BuildContext context) {
@@ -470,16 +471,14 @@ List decodeList(List list) {
   return ret;
 }
 
-void _nameFromMail(mail) async {
-  DocumentReference ref =
-      FirebaseFirestore.instance.collection('Rooms').doc(mail);
-  var doc = await ref.get();
-  return doc.get('name');
-}
-
-Future<void> alertLeagueOver(BuildContext context, Users user, league) async {
+Future<void> alertLeagueOver(
+    BuildContext context, Users user, league, results, int resultIdx) async {
   confettiController.play();
-  prefs?.setBool('leagueAlerted' + league.id, true);
+  results[resultIdx]['alerted'] = true;
+  FirebaseFirestore.instance
+      .collection('Leagues')
+      .doc(league.id)
+      .update({'results': results});
   return await showDialog(
       context: context,
       builder: (context) {
@@ -492,7 +491,34 @@ Future<void> alertLeagueOver(BuildContext context, Users user, league) async {
           }
         });
         return AlertDialog(
-          title: Text('Con ' + player + " you placed " + place.toString()),
+          alignment: Alignment.center,
+          actionsAlignment: MainAxisAlignment.center,
+          title: Text(
+            league.name + ' ' + 'league'.tr() + " " + 'results'.tr(),
+            textAlign: TextAlign.center,
+          ),
+          content: Container(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('congrats'.tr() + ' ' + player),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text("place".tr() + ': ' + place.toString()),
+                )
+              ],
+            ),
+          ),
+          actions: [
+            ElevatedButton.icon(
+                onPressed: () {
+                  Share.share('I placed ' +
+                      place.toString() +
+                      ' in a league in the game Sayı Bulmaca');
+                },
+                icon: Icon(Icons.share),
+                label: Text('share'.tr()))
+          ],
         );
       });
 }
@@ -501,9 +527,18 @@ void setLeagueStatus(leagueId, players) async {
   DocumentReference documentReference =
       FirebaseFirestore.instance.collection("Leagues").doc(leagueId);
   var doc = await documentReference.get();
+  bool setFinished = false;
   if (doc.get('status') != -1) {
-    List matches = jsonDecode(doc.get('matchups'));
-    if (matches.every((match) => match['scores'][0] != '-1'))
+    if (doc.get('endDate') != '') {
+      DateTime end = DateTime.parse(doc.get('endDate'));
+      if (DateTime.now().compareTo(end) > -1) setFinished = true;
+    }
+    if (!setFinished) {
+      List matches = jsonDecode(doc.get('matchups'));
+      if (matches.every((match) => match['scores'][0] != '-1'))
+        setFinished = true;
+    }
+    if (setFinished)
       FirebaseFirestore.instance
           .collection("Leagues")
           .doc(leagueId)

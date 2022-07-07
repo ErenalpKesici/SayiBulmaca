@@ -175,80 +175,86 @@ class ExplorePage extends State<ExplorePageSend> {
         child: Card(
           elevation: 1,
           child: ListTile(
-            onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => LeagueDetailsPageSend(
-                        league: snapshot.data[index],
-                        user: this.user,
-                      )));
-            },
+            onTap: joinedLeagues.contains(snapshot.data[index].id)
+                ? () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => LeagueDetailsPageSend(
+                              league: snapshot.data[index],
+                              user: this.user,
+                            )));
+                  }
+                : null,
             tileColor: Theme.of(context).cardColor,
             title: Text(snapshot.data[index].name),
             subtitle: Text(snapshot.data[index].players.length.toString() +
                 ' ' +
                 'players'.tr()),
-            trailing: snapshot.data[index].matchups.isNotEmpty
-                ? Text("joinedLeague".tr())
-                : snapshot.data[index].host == this.user!.email
-                    ? ElevatedButton.icon(
-                        onPressed: () async {
-                          showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                    actionsAlignment: MainAxisAlignment.center,
-                                    title: Text('alertDeleteLeague'.tr()),
-                                    actions: [
-                                      ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                          },
-                                          child: Text('no'.tr())),
-                                      ElevatedButton(
-                                          onPressed: () async {
-                                            await FirebaseFirestore.instance
-                                                .collection("Leagues")
-                                                .doc(snapshot.data[index].id)
-                                                .delete();
-                                            Navigator.pop(context);
-                                            setState(() {});
-                                          },
-                                          child: Text('yes'.tr())),
-                                    ],
-                                  ));
-                        },
-                        icon: Icon(Icons.delete),
-                        label: Text('delete'.tr()))
-                    : joinedLeagues.contains(snapshot.data[index].id)
+            trailing: snapshot.data[index].status == 1
+                ? Text("ongoing".tr() + " " + "league".tr())
+                : snapshot.data[index].status == -1
+                    ? Text('over'.tr() + ' ' + 'league'.tr())
+                    : snapshot.data[index].host == this.user!.email
                         ? ElevatedButton.icon(
                             onPressed: () async {
-                              await removeFrom(this.user!.email, 'Leagues',
-                                  snapshot.data[index].id, 'players');
-                              setState(() {
-                                joinedLeagues.removeWhere((element) =>
-                                    element == snapshot.data[index].id);
-                              });
+                              showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                        actionsAlignment:
+                                            MainAxisAlignment.center,
+                                        title: Text('alertDeleteLeague'.tr()),
+                                        actions: [
+                                          ElevatedButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                              },
+                                              child: Text('no'.tr())),
+                                          ElevatedButton(
+                                              onPressed: () async {
+                                                await FirebaseFirestore.instance
+                                                    .collection("Leagues")
+                                                    .doc(
+                                                        snapshot.data[index].id)
+                                                    .delete();
+                                                Navigator.pop(context);
+                                                setState(() {});
+                                              },
+                                              child: Text('yes'.tr())),
+                                        ],
+                                      ));
                             },
-                            icon: Icon(Icons.exit_to_app),
-                            label: Text('leave'.tr()))
-                        : ElevatedButton.icon(
-                            onPressed: () async {
-                              DocumentReference documentReference =
+                            icon: Icon(Icons.delete),
+                            label: Text('delete'.tr()))
+                        : joinedLeagues.contains(snapshot.data[index].id)
+                            ? ElevatedButton.icon(
+                                onPressed: () async {
+                                  await removeFrom(this.user!.email, 'Leagues',
+                                      snapshot.data[index].id, 'players');
+                                  setState(() {
+                                    joinedLeagues.removeWhere((element) =>
+                                        element == snapshot.data[index].id);
+                                  });
+                                },
+                                icon: Icon(Icons.exit_to_app),
+                                label: Text('leave'.tr()))
+                            : ElevatedButton.icon(
+                                onPressed: () async {
+                                  DocumentReference documentReference =
+                                      FirebaseFirestore.instance
+                                          .collection("Leagues")
+                                          .doc(snapshot.data[index].id);
+                                  var doc = await documentReference.get();
+                                  List players = doc.get('players');
+                                  players.add(jsonEncode(this.user));
                                   FirebaseFirestore.instance
                                       .collection("Leagues")
-                                      .doc(snapshot.data[index].id);
-                              var doc = await documentReference.get();
-                              List players = doc.get('players');
-                              players.add(jsonEncode(this.user));
-                              FirebaseFirestore.instance
-                                  .collection("Leagues")
-                                  .doc(snapshot.data[index].id)
-                                  .update({'players': players});
-                              setState(() {
-                                joinedLeagues.add(snapshot.data[index].id);
-                              });
-                            },
-                            icon: Icon(Icons.start),
-                            label: Text('join'.tr())),
+                                      .doc(snapshot.data[index].id)
+                                      .update({'players': players});
+                                  setState(() {
+                                    joinedLeagues.add(snapshot.data[index].id);
+                                  });
+                                },
+                                icon: Icon(Icons.start),
+                                label: Text('join'.tr())),
           ),
         ),
       ),

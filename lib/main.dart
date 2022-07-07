@@ -920,14 +920,15 @@ class SearchPage extends State<SearchPageSend> {
     } catch (e) {
       print(e);
     }
-    List startDates = List.empty(growable: true);
-    leaguesFound.forEach((element) {
-      startDates.add(element['league'].startDate);
-    });
-    startDates.sort((a, b) => a.compareTo(b));
-    var league = leaguesFound[leaguesFound.indexWhere(
-        (element) => element['league'].startDate == startDates.first)];
-    return league;
+    if (leaguesFound.isNotEmpty) {
+      List startDates = List.empty(growable: true);
+      leaguesFound.forEach((element) {
+        startDates.add(element['league'].startDate);
+      });
+      startDates.sort((a, b) => a.compareTo(b));
+      return leaguesFound[leaguesFound.indexWhere(
+          (element) => element['league'].startDate == startDates.first)];
+    }
   }
 
   @override
@@ -1061,15 +1062,21 @@ class SearchPage extends State<SearchPageSend> {
                         AsyncSnapshot<dynamic> snapshot) {
                       if (snapshot.hasData) {
                         SchedulerBinding.instance.addPostFrameCallback((_) {
-                          bool? alreadyAlerted = prefs?.getBool(
-                              'leagueAlerted' + snapshot.data['league'].id);
-                          if (snapshot.data['league'].status == -1 &&
-                                  alreadyAlerted == null ||
-                              alreadyAlerted == false) {
-                            alertLeagueOver(
-                                context, this.user!, snapshot.data['league']);
+                          try {
+                            List results = snapshot.data['league'].results;
+                            int resultIdx = results.indexWhere((element) =>
+                                jsonDecode(element['player'])['email'] ==
+                                this.user!.email);
+                            if (snapshot.data['league'].status == -1 &&
+                                results[resultIdx]['alerted'] == false) {
+                              alertLeagueOver(context, this.user!,
+                                  snapshot.data['league'], results, resultIdx);
+                            }
+                          } catch (e) {
+                            print(e);
                           }
                         });
+
                         return Column(
                           children: [
                             SizedBox(
@@ -1085,7 +1092,7 @@ class SearchPage extends State<SearchPageSend> {
                                 style: ElevatedButton.styleFrom(
                                     padding: EdgeInsets.all(16)),
                                 icon: Icon(Icons.leaderboard),
-                                label: Text('joinedLeague'.tr(),
+                                label: Text('recentJoinedLeague'.tr(),
                                     style: TextStyle(fontSize: 30))),
                           ],
                         );
@@ -1849,6 +1856,7 @@ class GamePage extends State<GamePageSend> {
   List<String>? otherPlayers;
   bool guessEnabled = true, hintAvailable = true, alertHint = false;
   String _lblText = '';
+  late Future<List> _fGetPlayer;
   GamePage(this.user, this.room, this.options, this.ifLeagueInfo);
 
   Future<List> _getPlayers(bool _getStatus, bool _getSum) async {
@@ -2092,6 +2100,23 @@ class GamePage extends State<GamePageSend> {
     } else {
       List userScores =
           await _getScores(scores, document.get('players'), false);
+      if (ifLeagueInfo != null) {
+        List matchups = jsonDecode(
+            await getField('Leagues', ifLeagueInfo['leagueId'], 'matchups'));
+        int userIdx = matchups[int.parse(ifLeagueInfo!['matchupIdx'])]
+                ['players']
+            .indexWhere(
+                (player) => jsonDecode(player)['email'] == this.user!.email);
+        if (int.parse(matchups[int.parse(ifLeagueInfo!['matchupIdx'])]['scores']
+                [userIdx]) <
+            0)
+          matchups[int.parse(ifLeagueInfo!['matchupIdx'])]['scores'][userIdx] =
+              "0";
+        FirebaseFirestore.instance
+            .collection('Leagues')
+            .doc(ifLeagueInfo['leagueId'])
+            .update({'matchups': jsonEncode(matchups)});
+      }
       userScores.sort(
         (a, b) => b.values.first.compareTo(a.values.first),
       );
@@ -2227,6 +2252,7 @@ class GamePage extends State<GamePageSend> {
     insertRound();
     currentDuration = options!.duration;
     startTimer();
+    _fGetPlayer = _getPlayers(true, false);
     super.initState();
   }
 
@@ -2259,7 +2285,8 @@ class GamePage extends State<GamePageSend> {
     return (await showDialog(
             context: context,
             builder: (context) => new AlertDialog(
-                  title: Text("alertLeaveGame".tr()),
+                  title:
+                      Text("alertLeaveGame".tr(), textAlign: TextAlign.center),
                   actions: [
                     ElevatedButton(
                       child: Text('no'.tr().toString()),
@@ -2445,7 +2472,7 @@ class GamePage extends State<GamePageSend> {
                               )
                             : Container();
                       },
-                      future: _getPlayers(true, false),
+                      future: _fGetPlayer,
                     ),
                   ),
                 ],
