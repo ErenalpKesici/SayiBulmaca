@@ -21,7 +21,6 @@ class SettingsPage extends State<SettingsPageSend> {
   Users? user;
   String? lang;
   bool? sound;
-  bool? scanInvite;
   SettingsPage(this.user);
   List<Color?>? languageColor = List.empty(growable: true);
   @override

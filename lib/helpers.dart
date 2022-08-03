@@ -474,6 +474,9 @@ List decodeList(List list) {
 Future<void> alertLeagueOver(
     BuildContext context, Users user, league, results, int resultIdx) async {
   confettiController.play();
+  Future.delayed(const Duration(seconds: 2), () {
+    confettiController.stop();
+  });
   results[resultIdx]['alerted'] = true;
   FirebaseFirestore.instance
       .collection('Leagues')

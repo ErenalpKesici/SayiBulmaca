@@ -68,6 +68,41 @@ class LeagueDetailsPage extends State<LeagueDetailsPageSend> {
         appBar: AppBar(
           centerTitle: true,
           title: Text('league'.tr() + ' ' + league!.name!),
+          actions: [
+            IconButton(
+                icon: Icon(Icons.delete),
+                onPressed: league!.host == this.user!.email!
+                    ? () async {
+                        await showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                                  actionsAlignment: MainAxisAlignment.center,
+                                  title: Text('alertDeleteLeague'.tr()),
+                                  actions: [
+                                    ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                        },
+                                        child: Text('no'.tr())),
+                                    ElevatedButton(
+                                        onPressed: () async {
+                                          await FirebaseFirestore.instance
+                                              .collection("Leagues")
+                                              .doc(league!.id)
+                                              .delete();
+                                          Navigator.pop(context);
+                                          Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      ExplorePageSend(
+                                                          user: user)));
+                                        },
+                                        child: Text('yes'.tr())),
+                                  ],
+                                ));
+                      }
+                    : null)
+          ],
         ),
         body: Padding(
           padding: const EdgeInsets.all(8.0),

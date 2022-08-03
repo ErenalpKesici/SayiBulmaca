@@ -28,7 +28,6 @@ import 'package:flutter_signin_button/flutter_signin_button.dart';
 import 'account_settings.dart';
 import 'explore.dart';
 import 'helpers.dart';
-import 'package:intl/intl.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import 'league.dart';
@@ -74,7 +73,6 @@ void toMainPage(BuildContext context, Users user) {
 
 void _initPrefs() async {
   prefs = await SharedPreferences.getInstance();
-  if (prefs?.getBool('scanInvite') == null) prefs!.setBool('scanInvite', true);
   if (prefs?.getBool('sound') == null) prefs!.setBool('sound', false);
   if (prefs?.getBool('durationEnabled') == null)
     prefs!.setBool('durationEnabled', false);
@@ -192,7 +190,7 @@ class InitialPage extends State<InitialPageSend> {
   GoogleSignInAccount? googleAccount;
   GoogleSignIn googleSignIn = GoogleSignIn();
   GoogleAuthProvider google = GoogleAuthProvider();
-
+  bool passHidden = true;
   @override
   void initState() {
     super.initState();
@@ -242,7 +240,22 @@ class InitialPage extends State<InitialPageSend> {
                 child: TextField(
                   controller: password,
                   textAlign: TextAlign.center,
+                  obscureText: passHidden,
                   decoration: InputDecoration(
+                      suffixIcon: IconButton(
+                        color: passHidden
+                            ? Colors.grey
+                            : Theme.of(context).primaryColor,
+                        icon: Icon(Icons.remove_red_eye_outlined),
+                        onPressed: () {
+                          setState(() {
+                            if (passHidden)
+                              passHidden = false;
+                            else
+                              passHidden = true;
+                          });
+                        },
+                      ),
                       labelText: 'pass'.tr().toString(),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10))),
@@ -371,15 +384,15 @@ class InitialPage extends State<InitialPageSend> {
                   'language': systemLanguage,
                   'method': 'google'
                 });
-                Users user = new Users(
-                    email: userCredential.user!.email,
-                    password: userCredential.user!.uid,
-                    picture: userCredential.user!.photoURL,
-                    name: userCredential.user!.displayName,
-                    language: systemLanguage,
-                    xp: 0,
-                    credit: 0,
-                    method: 'google');
+                // Users user = new Users(
+                //     email: userCredential.user!.email,
+                //     password: userCredential.user!.uid,
+                //     picture: userCredential.user!.photoURL,
+                //     name: userCredential.user!.displayName,
+                //     language: systemLanguage,
+                //     xp: 0,
+                //     credit: 0,
+                //     method: 'google');
               }
             }),
             SignInButton(
